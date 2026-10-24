@@ -1,7 +1,9 @@
 package io.ynay.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -133,7 +135,11 @@ class KanidmConfiguredTest extends IntegrationTest {
     @Test
     void inactiveTokensAreRejected() throws Exception {
         mvc.perform(get("/mcp/test-probe").header(HttpHeaders.AUTHORIZATION, "Bearer expired-token"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, containsString("invalid_token")));
+        mvc.perform(get("/mcp/test-probe").header(HttpHeaders.AUTHORIZATION, "Bearer garbage-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, containsString("invalid_token")));
     }
 
     // --- fake Kanidm ------------------------------------------------------------------------------
@@ -169,6 +175,12 @@ class KanidmConfiguredTest extends IntegrationTest {
                 if (pair.startsWith("token=")) {
                     token = URLDecoder.decode(pair.substring(6), StandardCharsets.UTF_8);
                 }
+            }
+            if (token.startsWith("garbage")) {
+                // real Kanidm: tokens it cannot parse get a bodyless 401 instead of {"active":false}
+                ex.sendResponseHeaders(401, -1);
+                ex.close();
+                return;
             }
             long exp = Instant.now().plusSeconds(300).getEpochSecond();
             String iss = origin + "/oauth2/openid/ynay";

@@ -21,6 +21,7 @@ import org.springframework.security.oauth2.server.resource.introspection.BadOpaq
 import org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionException;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClientResponseException;
 
 /**
  * Accepts Kanidm-issued OAuth2 access tokens on {@code /mcp} by asking Kanidm (RFC 7662
@@ -85,6 +86,13 @@ public class KanidmIntrospectionAuthenticationProvider implements Authentication
         } catch (BadOpaqueTokenException e) {
             throw new InvalidBearerTokenException(e.getMessage(), e);
         } catch (OAuth2IntrospectionException e) {
+            if (e.getCause() instanceof RestClientResponseException http && http.getStatusCode().is4xxClientError()) {
+                // Kanidm answers 401 (not {"active": false}) for tokens it cannot parse/decrypt. The
+                // same status would also come from a wrong client secret, hence the hint.
+                log.debug("Kanidm rejected the bearer token at introspection (HTTP {}); if every token is "
+                        + "rejected, check YNAY_KANIDM_CLIENT_SECRET", http.getStatusCode().value());
+                throw new InvalidBearerTokenException("Invalid or expired access token", e);
+            }
             log.warn("Kanidm token introspection failed: {}", e.getMessage());
             throw new AuthenticationServiceException(e.getMessage(), e);
         }

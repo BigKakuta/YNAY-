@@ -1,5 +1,6 @@
 package io.ynay.security;
 
+import io.ynay.security.oidc.IdpUnavailableFilter;
 import io.ynay.security.oidc.KanidmClientRegistrationRepository;
 import io.ynay.security.oidc.KanidmOidcUserService;
 import io.ynay.security.token.ApiTokenAuthenticationProvider;
@@ -181,7 +182,9 @@ public class SecurityConfig {
                     .authorizationEndpoint(a -> a.authorizationRequestResolver(resolver))
                     .userInfoEndpoint(u -> u.oidcUserService(new KanidmOidcUserService(users)))
                     .defaultSuccessUrl("/", true)
-                    .failureUrl("/?login_error"));
+                    .failureUrl("/?login_error"))
+                    .addFilterBefore(new IdpUnavailableFilter(registrations),
+                            OAuth2AuthorizationRequestRedirectFilter.class);
         }
         return http.build();
     }
