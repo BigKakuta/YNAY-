@@ -103,6 +103,11 @@ Limits: one conversation is at most 200,000 characters (about 2,000-4,000 statem
 larger exports by month. A turn stops after `YNAY_AGENT_MAX_ITERATIONS` model calls; reply
 "continue" to let it carry on.
 
+A turn is one long HTTP request (`POST /api/agent/chat`). If YNAY sits behind a reverse proxy,
+raise its read timeout to match `YNAY_AGENT_TIMEOUT` or more (nginx: `proxy_read_timeout 600s;`,
+Traefik: `respondingTimeouts.readTimeout`), or large imports fail with a 504 from the proxy even
+though the import keeps running on the server.
+
 ### Security model
 
 - The assistant runs **as you**: every tool call goes through the same action code and
