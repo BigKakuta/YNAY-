@@ -240,7 +240,8 @@ function Message({ entry }: { entry: ChatEntry }) {
         const input = c.input as { accountId?: string } | null;
         const output = c.output as { imported?: number } | null;
         const account = accounts.find((a) => a.id === input?.accountId);
-        if (!account) return null;
+        // nothing to review when every line was a duplicate
+        if (!account || !output?.imported) return null;
         return (
           <Link key={i} className="btn btn-success btn-sm" to={`/budgets/${budgetId}/accounts/${account.id}`}>
             Review {output?.imported ?? ''} imported transaction{output?.imported === 1 ? '' : 's'} in {account.name} →

@@ -656,7 +656,7 @@ export function createHandlers(s: MockState) {
         const cc = s.categories.find((c) => c.linkedAccountId === a.id);
         if (cc) cc.name = a.name;
       }
-      if (in_.note !== undefined) a.note = in_.note || null;
+      if (in_.note != null) a.note = in_.note || null; // like the backend: null = unchanged, "" clears
       if (in_.closed != null) {
         if (in_.closed && accountDto(a).balance !== 0) throw invalid('Only accounts with a zero balance can be closed');
         a.closed = in_.closed;
@@ -723,7 +723,7 @@ export function createHandlers(s: MockState) {
       if (in_.name != null) c.name = str(in_.name, 'name');
       if (in_.groupId != null) c.groupId = in_.groupId;
       if (in_.hidden != null) c.hidden = in_.hidden;
-      if (in_.note !== undefined) c.note = in_.note || null;
+      if (in_.note != null) c.note = in_.note || null; // like the backend: null = unchanged, "" clears
       if (in_.sortOrder != null) c.sortOrder = in_.sortOrder;
       return categoryDto(c);
     },
@@ -817,7 +817,7 @@ export function createHandlers(s: MockState) {
         t.payeeId = r.payeeId;
         t.transferAccountId = r.transferAccountId;
       }
-      if (in_.memo !== undefined) t.memo = in_.memo || null;
+      if (in_.memo != null) t.memo = in_.memo || null;
       if (in_.cleared != null) t.cleared = in_.cleared;
       if (in_.approved != null) t.approved = in_.approved;
       if (in_.flagColor !== undefined) t.flagColor = in_.flagColor;

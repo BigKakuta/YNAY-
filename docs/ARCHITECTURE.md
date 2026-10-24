@@ -112,13 +112,14 @@ Only transactions on **on-budget** accounts affect the budget. For category `c` 
   * every categorized txn/split line on `A` with category `c ≠ P` (and `c` not Ready to Assign)
     adds `-amount` to `activity(P,m)` (spending 50 on the card moves 50 into P);
   * every transfer *into* `A` from an on-budget account (a payment, `+X` on A's side) adds `-X`
-    to `activity(P,m)`.
+    to `activity(P,m)` (and money moved off `A` to another on-budget account, `-X`, adds `X`).
 * `assigned(c,m)` = `month_assignment.assigned` (0 if no row).
 * `carryover(c,m)` = `max(available(c,m-1), 0)`. Overspending does not roll over in the category.
 * `available(c,m)` = `carryover + assigned + activity`.
 * `overspent(m)` = Σ over non-RTA categories of `max(-available(c,m), 0)`, plus
-  `max(-uncategorized(m), 0)` where `uncategorized(m)` is the sum of on-budget, non-transfer,
-  non-split txns with no category.
+  `max(-uncategorized(m), 0)` where `uncategorized(m)` is the sum of on-budget txns and split
+  lines with no category, excluding transfers between two on-budget accounts and uncategorized
+  "Starting Balance" txns (a transfer to a tracking account without a category does count).
 * `income(m)` = activity of the Ready to Assign category in `m`.
 * `readyToAssign(m)` = Σ_{k ≤ m} income(k) − Σ_{all k} assigned(k) − Σ_{k < m} overspent(k).
   (Future assignments reduce RTA immediately, as in YNAB; overspending hits RTA the next month.)
@@ -290,8 +291,8 @@ the given budget.
 | `YNAY_MCP_INTROSPECTION` | `false` | also accept Kanidm access tokens on `/mcp` via RFC 7662 introspection |
 | `YNAY_MCP_TOKEN_AUDIENCES` | client id | comma separated Kanidm client ids whose access tokens `/mcp` accepts |
 | `YNAY_AGENT_PROVIDER` | `anthropic` | `anthropic` or `openai` (any OpenAI-compatible server: Ollama, llama.cpp, vLLM) |
-| `YNAY_AGENT_API_KEY` | – | API key; agent is disabled when unset (except `openai` with a local base URL) |
-| `YNAY_AGENT_MODEL` | provider default | model id |
+| `YNAY_AGENT_API_KEY` | – | API key; agent is disabled when unset (except `openai` with a custom `YNAY_AGENT_BASE_URL`) |
+| `YNAY_AGENT_MODEL` | provider default | model id (required for `openai`, which has no default) |
 | `YNAY_AGENT_BASE_URL` | provider default | override API base URL |
 
 ## Repository layout

@@ -18,3 +18,10 @@ spirit of YNAB, built for the homelab:
 - [docs/MCP.md](docs/MCP.md): connect Claude Code, Claude Desktop or any MCP client
 - [docs/IMPORT_AGENT.md](docs/IMPORT_AGENT.md): import transactions with the agent
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): design, actions, budgeting rules
+
+## End-to-end smoke tests
+
+`e2e/` drives the whole stack (Postgres, a throwaway Kanidm, the jar with the SPA, MCP and the
+import assistant against a scripted fake LLM): `node e2e/ui-smoke.mjs` walks through the UI with
+Playwright and checks the budget math, `e2e/mcp-smoke.sh` acts as an MCP client. See
+[e2e/README.md](e2e/README.md) for the setup.

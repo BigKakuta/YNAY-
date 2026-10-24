@@ -79,7 +79,7 @@ class LlmHttp {
                     sleep(backoff(attempt, null));
                     continue;
                 }
-                throw new LlmException("Could not reach " + providerLabel + " at " + uri + ": " + e.getMessage(), e);
+                throw new LlmException("Could not reach " + providerLabel + " at " + uri + ": " + describe(e), e);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new LlmException("Interrupted while waiting for " + providerLabel, e);
@@ -100,6 +100,19 @@ class LlmHttp {
             }
             throw new LlmException(providerLabel + " answered HTTP " + status + ": " + errorMessage(response.body()));
         }
+    }
+
+    /**
+     * A readable reason for an I/O failure. The JDK client often throws a bare
+     * {@code ConnectException} whose message is null; the reason is then in a cause.
+     */
+    static String describe(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t.getMessage() != null && !t.getMessage().isBlank()) {
+                return t.getMessage() + " (" + t.getClass().getSimpleName() + ")";
+            }
+        }
+        return e.getClass().getSimpleName();
     }
 
     private Duration backoff(int attempt, String retryAfter) {

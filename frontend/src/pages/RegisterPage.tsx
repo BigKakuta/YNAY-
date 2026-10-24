@@ -231,9 +231,13 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 function TxnRow({ t, showAccount, onEdit }: { t: Transaction; showAccount: boolean; onEdit: () => void }) {
-  const { budgetId, currency } = useBudget();
+  const { budgetId, currency, accounts } = useBudget();
   const toast = useToast();
   const isSplit = t.splits.length > 0;
+  // Like the month math: only on-budget transactions need a category. Tracking accounts never have
+  // one, and an uncategorized opening balance (e.g. a credit card's debt) has no budget effect.
+  const needsCategory =
+    !!accounts.find((a) => a.id === t.accountId)?.onBudget && !(t.payeeName === 'Starting Balance' && !t.transferAccountId);
   const category = isSplit
     ? `Split (${t.splits.length})`
     : t.transferAccountId && !t.categoryId
@@ -261,7 +265,14 @@ function TxnRow({ t, showAccount, onEdit }: { t: Transaction; showAccount: boole
           )}
         </td>
         <td>
-          {category ?? (t.transferAccountId ? <span className="muted">Transfer</span> : <span className="badge badge-warn">Uncategorized</span>)}
+          {category ??
+            (t.transferAccountId ? (
+              <span className="muted">Transfer</span>
+            ) : needsCategory ? (
+              <span className="badge badge-warn">Uncategorized</span>
+            ) : (
+              <span className="muted">—</span>
+            ))}
         </td>
         <td className="muted">{t.memo}</td>
         <td className="num">{t.amount < 0 ? <Money value={-t.amount} currency={currency} signColor={false} /> : null}</td>
@@ -706,7 +717,7 @@ function AccountSettingsDialog({ account, onClose }: { account: Account; onClose
           budgetId,
           accountId: account.id,
           name: name.trim(),
-          note: note.trim() || null,
+          note: note.trim(), // "" clears the note; null would mean "unchanged"
           closed: closed !== account.closed ? closed : undefined,
         });
         onClose();

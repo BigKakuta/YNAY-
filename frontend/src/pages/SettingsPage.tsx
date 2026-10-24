@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { call } from '../api/client';
-import { invalidateAll, mutate, useQuery } from '../api/query';
+import { clearQueryCache, mutate, useQuery } from '../api/query';
 import type { CreatedApiToken, Role } from '../api/types';
 import { useToast } from '../components/toast';
 import { CopyButton, ErrorBox, Field, FormModal, Icon, Spinner, initials } from '../components/ui';
@@ -126,54 +126,57 @@ function McpSection() {
       {!tokens.data && !tokens.error && <Spinner />}
       {tokens.data && tokens.data.length === 0 && <p className="small muted">No tokens yet.</p>}
       {tokens.data && tokens.data.length > 0 && (
-        <table className="dtable">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Token</th>
-              <th>Created</th>
-              <th>Last used</th>
-              <th>Expires</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {tokens.data.map((t) => (
-              <tr key={t.id}>
-                <td><strong>{t.name}</strong></td>
-                <td><code>{t.tokenPrefix}…</code></td>
-                <td>{formatDateTime(t.createdAt)}</td>
-                <td>{t.lastUsedAt ? formatDateTime(t.lastUsedAt) : <span className="muted">Never</span>}</td>
-                <td>{t.expiresAt ? formatDateTime(t.expiresAt) : <span className="muted">Never</span>}</td>
-                <td className="right">
-                  {revoking === t.id ? (
-                    <span className="row" style={{ justifyContent: 'flex-end' }}>
-                      <button
-                        className="btn btn-danger-solid btn-sm"
-                        onClick={() =>
-                          mutate('revoke_api_token', { tokenId: t.id }).then(() => {
-                            setRevoking(null);
-                            if (created?.id === t.id) setCreated(null);
-                            toast.info('Token revoked');
-                          }, toast.error)
-                        }
-                      >
-                        Revoke
-                      </button>
-                      <button className="btn btn-sm" onClick={() => setRevoking(null)}>
-                        Keep
-                      </button>
-                    </span>
-                  ) : (
-                    <button className="btn btn-danger btn-sm" onClick={() => setRevoking(t.id)}>
-                      Revoke…
-                    </button>
-                  )}
-                </td>
+        // scrolls by itself on phones instead of widening the whole page
+        <div className="table-wrap">
+          <table className="dtable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Token</th>
+                <th>Created</th>
+                <th>Last used</th>
+                <th>Expires</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {tokens.data.map((t) => (
+                <tr key={t.id}>
+                  <td><strong>{t.name}</strong></td>
+                  <td><code>{t.tokenPrefix}…</code></td>
+                  <td>{formatDateTime(t.createdAt)}</td>
+                  <td>{t.lastUsedAt ? formatDateTime(t.lastUsedAt) : <span className="muted">Never</span>}</td>
+                  <td>{t.expiresAt ? formatDateTime(t.expiresAt) : <span className="muted">Never</span>}</td>
+                  <td className="right">
+                    {revoking === t.id ? (
+                      <span className="row" style={{ justifyContent: 'flex-end' }}>
+                        <button
+                          className="btn btn-danger-solid btn-sm"
+                          onClick={() =>
+                            mutate('revoke_api_token', { tokenId: t.id }).then(() => {
+                              setRevoking(null);
+                              if (created?.id === t.id) setCreated(null);
+                              toast.info('Token revoked');
+                            }, toast.error)
+                          }
+                        >
+                          Revoke
+                        </button>
+                        <button className="btn btn-sm" onClick={() => setRevoking(null)}>
+                          Keep
+                        </button>
+                      </span>
+                    ) : (
+                      <button className="btn btn-danger btn-sm" onClick={() => setRevoking(t.id)}>
+                        Revoke…
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       <hr className="divider" />
       <div className="stack">
@@ -372,8 +375,10 @@ function DangerZone() {
           onClose={() => setOpen(false)}
           onSubmit={async () => {
             await call('delete_budget', { budgetId });
+            // Forget the cache instead of refetching it: the still-mounted queries of this budget
+            // would only come back 404. The budget list is fetched fresh on the way out.
+            clearQueryCache();
             navigate('/');
-            void invalidateAll();
           }}
         >
           <p className="small">This cannot be undone. Type the budget name to confirm.</p>

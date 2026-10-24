@@ -88,6 +88,98 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: /approve all/i })).not.toBeInTheDocument());
     expect(screen.queryAllByText('New')).toHaveLength(0);
   });
+
+  it('flags uncategorized transactions only where the budget needs a category', async () => {
+    const b = household();
+    const account = (name: string) =>
+      (backend.handlers.list_accounts!({ budgetId: b.id }) as { id: string; name: string }[]).find((a) => a.name === name)!;
+    const card = backend.handlers.create_account!({ budgetId: b.id, name: 'Amex', type: 'CREDIT_CARD', startingBalance: -200_000 }) as { id: string };
+    backend.handlers.create_transaction!({ budgetId: b.id, accountId: card.id, date: '2026-01-15', amount: -9_000, payeeName: 'Kiosk' });
+
+    // a credit card's opening debt has no budget effect; a new uncategorized purchase does
+    const { unmount } = renderAt(`/budgets/${b.id}/accounts/${card.id}`);
+    const kiosk = (await screen.findByText('Kiosk')).closest('tr')!;
+    expect(within(kiosk).getByText('Uncategorized')).toBeInTheDocument();
+    const opening = screen.getByText('Starting Balance').closest('tr')!;
+    expect(within(opening).queryByText('Uncategorized')).not.toBeInTheDocument();
+    unmount();
+
+    // tracking accounts never take categories
+    renderAt(`/budgets/${b.id}/accounts/${account('Brokerage').id}`);
+    await screen.findByText('Starting Balance');
+    expect(screen.queryByText('Uncategorized')).not.toBeInTheDocument();
+  });
+
+  it('links to the register only for imports that created transactions', async () => {
+    const user = userEvent.setup();
+    Element.prototype.scrollTo ??= () => {}; // not implemented by jsdom
+    const b = household();
+    renderAt(`/budgets/${b.id}/import`);
+    const send = async () => {
+      await user.selectOptions(await screen.findByLabelText('Import into account'), 'Account: Wallet');
+      await user.type(screen.getByLabelText('Message'), '2026-01-20, Kiosk, -4.50');
+      await user.click(screen.getByRole('button', { name: /send/i }));
+    };
+    await send();
+    expect(await screen.findByRole('link', { name: /review 1 imported transaction in wallet/i }, { timeout: 3000 })).toBeInTheDocument();
+    await send(); // same line again: a duplicate, nothing new to review
+    await waitFor(() => expect(screen.getAllByText('import_transactions')).toHaveLength(2), { timeout: 3000 });
+    expect(screen.getAllByRole('link', { name: /review .* imported/i })).toHaveLength(1);
+  });
+
+  it('deletes a budget without refetching its queries', async () => {
+    const user = userEvent.setup();
+    const b = household();
+    renderAt(`/budgets/${b.id}/settings`);
+    await user.click(await screen.findByRole('button', { name: /delete this budget/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Budget name'), b.name);
+    const before = vi.mocked(fetch).mock.calls.length;
+    await user.click(within(dialog).getByRole('button', { name: /delete budget forever/i }));
+
+    expect(await screen.findByText('Holiday flat')).toBeInTheDocument();
+    expect(screen.queryByText('Household')).not.toBeInTheDocument();
+    const after = vi.mocked(fetch).mock.calls.slice(before).map(([url, init]) => `${String(url)} ${String(init?.body ?? '')}`);
+    expect(after.filter((c) => c.includes(b.id) && !c.includes('/delete_budget'))).toEqual([]);
+  });
+
+  // update_* actions treat null as "unchanged"; clearing a text field has to send "".
+  const lastBody = (action: string) => {
+    const call = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith(`/api/actions/${action}`)).at(-1);
+    return JSON.parse(String(call![1]!.body)) as Record<string, unknown>;
+  };
+
+  it('clears a category note', async () => {
+    const user = userEvent.setup();
+    const b = household();
+    renderAt(`/budgets/${b.id}/budget/${currentMonth()}`);
+    await user.click(await screen.findByRole('button', { name: 'Medical' }));
+    const panel = await screen.findByRole('complementary', { name: 'Medical details' });
+    const note = within(panel).getByLabelText('Note');
+    expect(note).toHaveValue('Co-pays and prescriptions');
+    await user.clear(note);
+    await user.click(within(panel).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(lastBody('update_category').note).toBe(''));
+    const groups = backend.handlers.list_categories!({ budgetId: b.id }) as { categories: { name: string; note: string | null }[] }[];
+    expect(groups.flatMap((g) => g.categories).find((c) => c.name === 'Medical')!.note).toBeNull();
+  });
+
+  it('clears an account note', async () => {
+    const user = userEvent.setup();
+    const b = household();
+    const accounts = () => backend.handlers.list_accounts!({ budgetId: b.id }) as { id: string; name: string; note: string | null }[];
+    const checking = accounts().find((a) => a.name === 'Checking')!;
+    backend.handlers.update_account!({ budgetId: b.id, accountId: checking.id, note: 'joint account' });
+    renderAt(`/budgets/${b.id}/accounts/${checking.id}`);
+    await user.click(await screen.findByRole('button', { name: 'Account settings' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText('Note'));
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(lastBody('update_account').note).toBe(''));
+    expect(accounts().find((a) => a.id === checking.id)!.note).toBeNull();
+  });
 });
 
 describe('AssignInput', () => {
