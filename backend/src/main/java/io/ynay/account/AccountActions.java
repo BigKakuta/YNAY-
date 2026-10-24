@@ -80,6 +80,9 @@ public class AccountActions {
         if (accounts.nameTaken(in.budgetId(), name, null)) {
             throw ActionException.conflict("An account named '" + name + "' already exists");
         }
+        if (payees.findByName(in.budgetId(), PayeeService.transferPayeeName(name)).isPresent()) {
+            throw ActionException.conflict("A payee named '" + PayeeService.transferPayeeName(name) + "' already exists");
+        }
         boolean onBudget = in.onBudget() != null ? in.onBudget() : in.type().onBudgetByDefault();
         UUID id = UUID.randomUUID();
         jdbc.sql("""
@@ -121,8 +124,8 @@ public class AccountActions {
                 if (accounts.nameTaken(in.budgetId(), name, account.id())) {
                     throw ActionException.conflict("An account named '" + name + "' already exists");
                 }
-                jdbc.sql("update account set name = ? where id = ?").params(name, account.id()).update();
                 payees.renameTransferPayee(in.budgetId(), account.id(), name);
+                jdbc.sql("update account set name = ? where id = ?").params(name, account.id()).update();
                 categories.renameLinkedCategory(account.id(), name);
             }
         }
