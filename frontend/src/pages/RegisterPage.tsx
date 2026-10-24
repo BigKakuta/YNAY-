@@ -706,7 +706,7 @@ function AccountSettingsDialog({ account, onClose }: { account: Account; onClose
           budgetId,
           accountId: account.id,
           name: name.trim(),
-          note: note.trim() || null,
+          note: note.trim(), // "" clears the note; null would mean "unchanged"
           closed: closed !== account.closed ? closed : undefined,
         });
         onClose();

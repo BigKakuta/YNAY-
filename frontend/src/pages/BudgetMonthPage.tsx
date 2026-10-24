@@ -482,7 +482,8 @@ function CategoryPanel({
           className="stack"
           onSubmit={(e) => {
             e.preventDefault();
-            mutate('update_category', { budgetId, categoryId: cat.categoryId, name: name.trim(), note: note.trim() || null }).then(
+            // null would mean "unchanged" to the backend; "" clears the note.
+            mutate('update_category', { budgetId, categoryId: cat.categoryId, name: name.trim(), note: note.trim() }).then(
               () => toast.info('Category saved'),
               toast.error,
             );

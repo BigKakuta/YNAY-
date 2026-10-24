@@ -88,6 +88,44 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: /approve all/i })).not.toBeInTheDocument());
     expect(screen.queryAllByText('New')).toHaveLength(0);
   });
+
+  // update_* actions treat null as "unchanged"; clearing a text field has to send "".
+  const lastBody = (action: string) => {
+    const call = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith(`/api/actions/${action}`)).at(-1);
+    return JSON.parse(String(call![1]!.body)) as Record<string, unknown>;
+  };
+
+  it('clears a category note', async () => {
+    const user = userEvent.setup();
+    const b = household();
+    renderAt(`/budgets/${b.id}/budget/${currentMonth()}`);
+    await user.click(await screen.findByRole('button', { name: 'Medical' }));
+    const panel = await screen.findByRole('complementary', { name: 'Medical details' });
+    const note = within(panel).getByLabelText('Note');
+    expect(note).toHaveValue('Co-pays and prescriptions');
+    await user.clear(note);
+    await user.click(within(panel).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(lastBody('update_category').note).toBe(''));
+    const groups = backend.handlers.list_categories!({ budgetId: b.id }) as { categories: { name: string; note: string | null }[] }[];
+    expect(groups.flatMap((g) => g.categories).find((c) => c.name === 'Medical')!.note).toBeNull();
+  });
+
+  it('clears an account note', async () => {
+    const user = userEvent.setup();
+    const b = household();
+    const accounts = () => backend.handlers.list_accounts!({ budgetId: b.id }) as { id: string; name: string; note: string | null }[];
+    const checking = accounts().find((a) => a.name === 'Checking')!;
+    backend.handlers.update_account!({ budgetId: b.id, accountId: checking.id, note: 'joint account' });
+    renderAt(`/budgets/${b.id}/accounts/${checking.id}`);
+    await user.click(await screen.findByRole('button', { name: 'Account settings' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText('Note'));
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(lastBody('update_account').note).toBe(''));
+    expect(accounts().find((a) => a.id === checking.id)!.note).toBeNull();
+  });
 });
 
 describe('AssignInput', () => {
