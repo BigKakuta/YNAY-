@@ -372,6 +372,7 @@ kbd {
   background: radial-gradient(1200px 600px at 20% -10%, var(--accent-soft), transparent), var(--bg);
 }
 .login-card { width: min(400px, 100%); text-align: center; padding: 40px 32px; display: flex; flex-direction: column; gap: var(--sp-4); align-items: center; }
+.login-error { width: 100%; margin: 0; padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-sm); background: var(--neg-bg); color: var(--neg); font-size: var(--fs-sm); }
 .logo { display: inline-flex; align-items: center; gap: 10px; font-weight: 750; font-size: var(--fs-xl); letter-spacing: -0.02em; }
 .logo-mark {
   width: 32px; height: 32px; border-radius: 9px; background: var(--accent); color: #fff; display: grid; place-items: center;
