@@ -1,0 +1,55 @@
+# YNAY + Postgres. See docs/DEPLOYMENT.md.
+#
+#   nix build .#dockerImage && docker load < result     # produces ynay:<version>
+#   cp deploy/.env.example deploy/.env && $EDITOR deploy/.env
+#   docker compose -f deploy/docker-compose.yml up -d
+#
+# Put a TLS-terminating reverse proxy (Caddy, Traefik, nginx) in front of port 8080 and set
+# YNAY_PUBLIC_URL to the public https:// origin.
+
+name: ynay
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ynay
+      POSTGRES_USER: ${YNAY_DB_USER:-ynay}
+      POSTGRES_PASSWORD: ${YNAY_DB_PASSWORD:?set YNAY_DB_PASSWORD in deploy/.env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d ynay"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  ynay:
+    # Built by Nix, not pulled from a registry: `nix build .#dockerImage && docker load < result`.
+    image: ynay:${YNAY_VERSION:-0.1.0}
+    pull_policy: never
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # Bind to localhost when a reverse proxy on the same host terminates TLS:
+      # YNAY_BIND=127.0.0.1 in .env.
+      - "${YNAY_BIND:-0.0.0.0}:${YNAY_HOST_PORT:-8080}:8080"
+    # Every variable set in .env is passed through (YNAY_*, JDK_JAVA_OPTIONS, ...). Unset optional
+    # variables are simply absent, so the application defaults from ARCHITECTURE.md apply.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      YNAY_DB_URL: jdbc:postgresql://postgres:5432/ynay
+      YNAY_DB_USER: ${YNAY_DB_USER:-ynay}
+      YNAY_DB_PASSWORD: ${YNAY_DB_PASSWORD:?set YNAY_DB_PASSWORD in deploy/.env}
+      YNAY_PORT: "8080"
+    # The image has no shell or curl; use the reverse proxy's health check or
+    # `curl http://localhost:8080/actuator/health` from the host.
+
+volumes:
+  postgres-data:
