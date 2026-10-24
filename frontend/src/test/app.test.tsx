@@ -127,6 +127,22 @@ describe('App', () => {
     expect(screen.getAllByRole('link', { name: /review .* imported/i })).toHaveLength(1);
   });
 
+  it('deletes a budget without refetching its queries', async () => {
+    const user = userEvent.setup();
+    const b = household();
+    renderAt(`/budgets/${b.id}/settings`);
+    await user.click(await screen.findByRole('button', { name: /delete this budget/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Budget name'), b.name);
+    const before = vi.mocked(fetch).mock.calls.length;
+    await user.click(within(dialog).getByRole('button', { name: /delete budget forever/i }));
+
+    expect(await screen.findByText('Holiday flat')).toBeInTheDocument();
+    expect(screen.queryByText('Household')).not.toBeInTheDocument();
+    const after = vi.mocked(fetch).mock.calls.slice(before).map(([url, init]) => `${String(url)} ${String(init?.body ?? '')}`);
+    expect(after.filter((c) => c.includes(b.id) && !c.includes('/delete_budget'))).toEqual([]);
+  });
+
   // update_* actions treat null as "unchanged"; clearing a text field has to send "".
   const lastBody = (action: string) => {
     const call = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith(`/api/actions/${action}`)).at(-1);

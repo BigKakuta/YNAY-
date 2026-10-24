@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { call } from '../api/client';
-import { invalidateAll, mutate, useQuery } from '../api/query';
+import { clearQueryCache, mutate, useQuery } from '../api/query';
 import type { CreatedApiToken, Role } from '../api/types';
 import { useToast } from '../components/toast';
 import { CopyButton, ErrorBox, Field, FormModal, Icon, Spinner, initials } from '../components/ui';
@@ -372,8 +372,10 @@ function DangerZone() {
           onClose={() => setOpen(false)}
           onSubmit={async () => {
             await call('delete_budget', { budgetId });
+            // Forget the cache instead of refetching it: the still-mounted queries of this budget
+            // would only come back 404. The budget list is fetched fresh on the way out.
+            clearQueryCache();
             navigate('/');
-            void invalidateAll();
           }}
         >
           <p className="small">This cannot be undone. Type the budget name to confirm.</p>

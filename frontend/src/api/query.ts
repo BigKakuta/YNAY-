@@ -67,7 +67,7 @@ export function invalidateAll(): Promise<void> {
   return Promise.all(runs).then(() => undefined);
 }
 
-/** Test helper. */
+/** Forget every cached query without refetching (tests, and leaving a deleted budget). */
 export function clearQueryCache() {
   cache.clear();
 }
