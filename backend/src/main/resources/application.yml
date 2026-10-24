@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: ynay
+  datasource:
+    url: ${YNAY_DB_URL:jdbc:postgresql://localhost:5432/ynay}
+    username: ${YNAY_DB_USER:ynay}
+    password: ${YNAY_DB_PASSWORD:ynay}
+  flyway:
+    enabled: true
+  threads:
+    virtual:
+      enabled: true
+  web:
+    resources:
+      # Static files and SPA client routes are served by io.ynay.web.SpaWebConfig.
+      add-mappings: false
+  security:
+    oauth2:
+      client:
+        # Registration "kanidm"; only used when YNAY_KANIDM_URL is set (see ynay.kanidm below).
+        registration:
+          kanidm:
+            provider: kanidm
+            client-id: ${YNAY_KANIDM_CLIENT_ID:ynay}
+            client-secret: ${YNAY_KANIDM_CLIENT_SECRET:}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: authorization_code
+            redirect-uri: "${YNAY_PUBLIC_URL:http://localhost:8080}/login/oauth2/code/{registrationId}"
+            scope: openid,profile,email
+            client-name: Kanidm
+        provider:
+          kanidm:
+            # Kanidm has one issuer per OAuth2 client.
+            issuer-uri: ${YNAY_KANIDM_URL:}/oauth2/openid/${YNAY_KANIDM_CLIENT_ID:ynay}
+            user-name-attribute: sub
+
+server:
+  port: ${YNAY_PORT:8080}
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        name: YNAY_SESSION
+        http-only: true
+        same-site: lax
+        # "secure" is derived from YNAY_PUBLIC_URL (https => Secure), see SecurityConfig.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+# --- Security (Kanidm OIDC login, API tokens, MCP auth). See docs/KANIDM.md. ---
+ynay:
+  public-url: ${YNAY_PUBLIC_URL:http://localhost:8080}
+  kanidm:
+    # Login is enabled only when YNAY_KANIDM_URL is set. OIDC discovery happens lazily on first login.
+    url: ${YNAY_KANIDM_URL:}
+    client-id: ${YNAY_KANIDM_CLIENT_ID:ynay}
+    client-secret: ${YNAY_KANIDM_CLIENT_SECRET:}
+    # Kanidm signs ID tokens with ES256; set RS256 if the client has enable-legacy-crypto.
+    id-token-alg: ${YNAY_KANIDM_ID_TOKEN_ALG:ES256}
+  mcp:
+    introspection: ${YNAY_MCP_INTROSPECTION:false}
+    # Kanidm OAuth2 client ids whose access tokens /mcp accepts (default: YNAY_KANIDM_CLIENT_ID).
+    token-audiences: ${YNAY_MCP_TOKEN_AUDIENCES:}
