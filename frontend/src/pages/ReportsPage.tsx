@@ -159,7 +159,8 @@ function ReportState<T>({ q, children }: { q: { data: T | undefined; error: Erro
 }
 
 function SpendingBars({ rows, currency }: { rows: SpendingRow[]; currency: string }) {
-  const spend = rows.filter((r) => r.total < 0).map((r) => ({ ...r, value: -r.total })).sort((a, b) => b.value - a.value);
+  // Spending totals are positive (net of refunds); a category with net refunds has a negative total.
+  const spend = rows.filter((r) => r.total > 0).map((r) => ({ ...r, value: r.total })).sort((a, b) => b.value - a.value);
   if (spend.length === 0) return <div className="empty">No spending in this period.</div>;
   const max = spend[0]!.value;
   return (

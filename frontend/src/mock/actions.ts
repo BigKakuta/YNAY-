@@ -822,7 +822,9 @@ export function createHandlers(s: MockState) {
       if (in_.approved != null) t.approved = in_.approved;
       if (in_.flagColor !== undefined) t.flagColor = in_.flagColor;
       if (in_.splits !== undefined) t.splits = buildSplits(in_.budgetId, in_.splits, t.amount);
-      if (in_.categoryId !== undefined) t.categoryId = in_.categoryId;
+      // Mirrors the backend: null means "unchanged"; clearCategory makes it uncategorized.
+      if (in_.categoryId != null) t.categoryId = in_.categoryId;
+      if (in_.clearCategory) t.categoryId = null;
       if (t.splits.length) t.categoryId = null;
       if (t.transferAccountId) {
         const other = getAccount(in_.budgetId, t.transferAccountId);
@@ -982,7 +984,8 @@ export function createHandlers(s: MockState) {
         const mb = monthBudget(in_.budgetId, m);
         for (const g of mb.groups) {
           if (g.systemKind === 'CREDIT_CARD_PAYMENTS') continue;
-          for (const c of g.categories) if (c.activity) totals.set(c.categoryId, (totals.get(c.categoryId) ?? 0) + c.activity);
+          // Same convention as the backend: spending is reported as a positive number.
+          for (const c of g.categories) if (c.activity) totals.set(c.categoryId, (totals.get(c.categoryId) ?? 0) - c.activity);
         }
       }
       const rows = [...totals]
@@ -990,7 +993,8 @@ export function createHandlers(s: MockState) {
           const c = s.categories.find((x) => x.id === categoryId)!;
           return { categoryId, categoryName: c.name, groupName: s.groups.find((g) => g.id === c.groupId)!.name, total };
         })
-        .sort((a, b) => a.total - b.total);
+        .filter((r) => r.total !== 0)
+        .sort((a, b) => b.total - a.total);
       return { rows, total: rows.reduce((a, r) => a + r.total, 0) };
     },
     report_income_vs_expense: (in_) => {
@@ -999,8 +1003,8 @@ export function createHandlers(s: MockState) {
         const mb = monthBudget(in_.budgetId, m);
         const expense = mb.groups
           .filter((g) => g.systemKind !== 'CREDIT_CARD_PAYMENTS')
-          .reduce((a, g) => a + g.categories.reduce((x, c) => x + Math.min(c.activity, 0), 0), 0);
-        return { month: m, income: mb.income, expense, net: mb.income + expense };
+          .reduce((a, g) => a + g.categories.reduce((x, c) => x - c.activity, 0), 0);
+        return { month: m, income: mb.income, expense, net: mb.income - expense };
       });
     },
     report_net_worth: (in_) => {

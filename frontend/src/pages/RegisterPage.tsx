@@ -390,15 +390,19 @@ function TxnEditor({
     const splitInputs: SplitInput[] | null = splits
       ? splits.map((s) => ({ amount: amountOf(s.outflow, s.inflow)!, categoryId: s.categoryId, memo: s.memo.trim() || null }))
       : null;
+    const newCategoryId = splits || transferNoCategory || trackingAccount ? null : categoryId;
+    const noPayee = !payee.transferAccountId && !payee.payeeId && !payee.name.trim();
+    // On update the backend treats null as "unchanged": clearing a value needs "" or clearCategory.
     const fields = {
       accountId,
       date,
       amount: amount!,
       payeeId: payee.transferAccountId ? undefined : (payee.payeeId ?? undefined),
-      payeeName: payee.transferAccountId || payee.payeeId || !payee.name.trim() ? undefined : payee.name.trim(),
+      payeeName: payee.transferAccountId || payee.payeeId ? undefined : noPayee ? (txn?.payeeId ? '' : undefined) : payee.name.trim(),
       transferAccountId: payee.transferAccountId ?? null,
-      categoryId: splits || transferNoCategory || trackingAccount ? null : categoryId,
-      memo: memo.trim() || null,
+      categoryId: newCategoryId,
+      clearCategory: txn && !splits && newCategoryId === null && txn.categoryId !== null ? true : undefined,
+      memo: txn ? memo.trim() : memo.trim() || null,
       cleared,
       approved: true,
       splits: splitInputs ?? (txn?.splits.length ? [] : undefined),

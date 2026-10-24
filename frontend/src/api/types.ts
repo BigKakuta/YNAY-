@@ -176,6 +176,8 @@ export type TransactionFields = {
   payeeId?: Uuid | null;
   payeeName?: string | null;
   categoryId?: Uuid | null;
+  /** update_transaction only: make the transaction uncategorized (categoryId null means "unchanged"). */
+  clearCategory?: boolean;
   memo?: string | null;
   cleared?: Cleared;
   approved?: boolean;
