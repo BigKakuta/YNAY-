@@ -120,8 +120,9 @@ Any client with Streamable HTTP support works with these settings:
 | URL | `https://ynay.example.com/mcp` |
 | header | `Authorization: Bearer ynay_pat_...` |
 
-Clients that only support stdio servers can use the `mcp-remote` bridge shown above. A quick check
-with curl:
+Clients that only support stdio servers can use the `mcp-remote` bridge shown above. Clients that
+run in a browser (e.g. the MCP Inspector at `http://localhost:6274`) send an `Origin` header, which
+`/mcp` rejects unless it is listed in `YNAY_MCP_ALLOWED_ORIGINS`. A quick check with curl:
 
 ```sh
 curl -s https://ynay.example.com/mcp \
