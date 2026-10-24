@@ -1,5 +1,6 @@
 package io.ynay.month;
 
+import io.ynay.category.TargetDto;
 import java.time.YearMonth;
 
 /** {@code targetNeeded(c, m)}: how much still has to be assigned in month m to meet the target. */

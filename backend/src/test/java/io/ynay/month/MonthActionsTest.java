@@ -1,5 +1,8 @@
 package io.ynay.month;
 
+import io.ynay.category.CategoryDto;
+import io.ynay.category.TargetDto;
+import io.ynay.category.TargetType;
 import static io.ynay.month.MonthBudgetTest.cat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -184,7 +187,7 @@ class MonthActionsTest extends IntegrationTest {
 
     @Test
     void setAndClearCategoryTarget() {
-        TargetCategoryDto dto = actions.setCategoryTarget(new SetCategoryTargetInput(
+        CategoryDto dto = actions.setCategoryTarget(new SetCategoryTargetInput(
                 f.budgetId, groceries, TargetType.MONTHLY_SPENDING, 400_000L, LocalDate.of(2027, 1, 1)));
         assertThat(dto.id()).isEqualTo(groceries);
         assertThat(dto.groupId()).isEqualTo(group);

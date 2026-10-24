@@ -1,5 +1,6 @@
 package io.ynay.month;
 
+import io.ynay.category.TargetDto;
 import java.util.UUID;
 
 /** One category's numbers for one month. All amounts in milliunits. */

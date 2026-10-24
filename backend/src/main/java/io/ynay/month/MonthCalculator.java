@@ -1,6 +1,9 @@
 package io.ynay.month;
 
 import io.ynay.action.ActionException;
+import io.ynay.category.TargetDto;
+import io.ynay.category.TargetType;
+import io.ynay.transaction.TransactionService;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -25,7 +28,7 @@ public class MonthCalculator {
     static final String INTERNAL = "INTERNAL";
 
     /** Payee name of opening-balance transactions; uncategorized ones have no budget effect. */
-    static final String STARTING_BALANCE_PAYEE = "Starting Balance";
+    static final String STARTING_BALANCE_PAYEE = TransactionService.STARTING_BALANCE_PAYEE;
 
     record GroupInfo(UUID id, String name, boolean hidden, int sortOrder, String systemKind) {
     }
@@ -35,10 +38,6 @@ public class MonthCalculator {
 
         boolean isReadyToAssign() {
             return READY_TO_ASSIGN.equals(systemKind);
-        }
-
-        TargetCategoryDto toDto() {
-            return new TargetCategoryDto(id, groupId, name, hidden, note, sortOrder, systemKind, linkedAccountId, target);
         }
     }
 

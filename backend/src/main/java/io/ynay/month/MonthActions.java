@@ -4,6 +4,9 @@ import io.ynay.action.ActionException;
 import io.ynay.action.ActionParam;
 import io.ynay.action.McpAction;
 import io.ynay.budget.BudgetAccess;
+import io.ynay.category.CategoryDto;
+import io.ynay.category.CategoryService;
+import io.ynay.category.TargetType;
 import io.ynay.month.MonthCalculator.CategoryInfo;
 import io.ynay.month.MonthCalculator.Computation;
 import io.ynay.month.MonthCalculator.MonthState;
@@ -77,8 +80,11 @@ public class MonthActions {
     private final BudgetAccess access;
     private final MonthCalculator calculator;
     private final JdbcClient jdbc;
+    private final CategoryService categories;
 
-    public MonthActions(BudgetAccess access, MonthCalculator calculator, JdbcClient jdbc) {
+    public MonthActions(BudgetAccess access, MonthCalculator calculator, JdbcClient jdbc,
+                        CategoryService categories) {
+        this.categories = categories;
         this.access = access;
         this.calculator = calculator;
         this.jdbc = jdbc;
@@ -195,7 +201,7 @@ public class MonthActions {
             MONTHLY_SPENDING = have `amount` available each month; TARGET_BALANCE = save up to a balance \
             of `amount`; TARGET_BALANCE_BY_DATE = reach `amount` by the month of `targetDate` (spread \
             evenly over the remaining months). Amount in milliunits. Returns the category.""")
-    public TargetCategoryDto setCategoryTarget(SetCategoryTargetInput in) {
+    public CategoryDto setCategoryTarget(SetCategoryTargetInput in) {
         access.requireMember(in.budgetId());
         CategoryInfo category = calculator.requireCategory(in.budgetId(), in.categoryId());
         if (category.isReadyToAssign()) {
@@ -223,12 +229,12 @@ public class MonthActions {
                 .param("id", category.id())
                 .param("b", in.budgetId())
                 .update();
-        return calculator.requireCategory(in.budgetId(), category.id()).toDto();
+        return categories.require(in.budgetId(), category.id());
     }
 
     @McpAction(name = "clear_category_target", idempotent = true, description = """
             Remove a category's target. Returns the category.""")
-    public TargetCategoryDto clearCategoryTarget(ClearCategoryTargetInput in) {
+    public CategoryDto clearCategoryTarget(ClearCategoryTargetInput in) {
         access.requireMember(in.budgetId());
         CategoryInfo category = calculator.requireCategory(in.budgetId(), in.categoryId());
         jdbc.sql("""
@@ -237,7 +243,7 @@ public class MonthActions {
                 .param("id", category.id())
                 .param("b", in.budgetId())
                 .update();
-        return calculator.requireCategory(in.budgetId(), category.id()).toDto();
+        return categories.require(in.budgetId(), category.id());
     }
 
     // ---------------------------------------------------------------- helpers

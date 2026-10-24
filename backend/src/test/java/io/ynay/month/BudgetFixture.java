@@ -1,5 +1,6 @@
 package io.ynay.month;
 
+import io.ynay.category.TargetType;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.UUID;

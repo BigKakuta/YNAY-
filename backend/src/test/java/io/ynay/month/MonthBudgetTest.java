@@ -1,5 +1,7 @@
 package io.ynay.month;
 
+import io.ynay.category.TargetDto;
+import io.ynay.category.TargetType;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
