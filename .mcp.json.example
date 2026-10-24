@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ynay": {
+      "type": "http",
+      "url": "${YNAY_URL:-https://ynay.example.com}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${YNAY_TOKEN}"
+      }
+    }
+  }
+}
