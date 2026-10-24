@@ -39,3 +39,6 @@ result-*
 *.local
 .idea/
 .vscode/
+
+# Throwaway Kanidm from deploy/kanidm/dev-kanidm.sh
+.kanidm-dev/
