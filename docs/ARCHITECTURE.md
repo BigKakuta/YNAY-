@@ -250,7 +250,7 @@ type MonthSummary = { month: string; income: number; assigned: number; activity:
 | `GET /` and static assets | public | React SPA (bundled into the jar under `static/`) |
 | `GET /api/me` | session | `Me`, or 401 → SPA shows "Sign in with Kanidm" |
 | `GET /oauth2/authorization/kanidm` | public | starts OIDC login |
-| `POST /logout` | session + CSRF | logout |
+| `POST /logout` | session + CSRF | logout; 302 to `/`, or with `Accept: application/json` → `200 {redirectUrl}` (see docs/KANIDM.md) |
 | `GET /api/actions` | session | action catalogue `[{name, description, inputSchema, readOnly, destructive, idempotent, mcp}]` |
 | `POST /api/actions/{name}` | session + CSRF | invoke action; body = input JSON; 200 = output JSON; error = `{"error": {"code", "message"}}` with the code's HTTP status |
 | `POST /mcp` | Bearer (API token `ynay_...` or Kanidm access token) | MCP Streamable HTTP (stateless, `application/json` responses) |
@@ -285,7 +285,9 @@ the given budget.
 | `YNAY_KANIDM_URL` | – | Kanidm origin, e.g. `https://idm.example.com` |
 | `YNAY_KANIDM_CLIENT_ID` | `ynay` | OAuth2 client name in Kanidm |
 | `YNAY_KANIDM_CLIENT_SECRET` | – | client secret (`kanidm system oauth2 show-basic-secret ynay`) |
+| `YNAY_KANIDM_ID_TOKEN_ALG` | `ES256` | ID token JWS algorithm (`RS256` if the Kanidm client uses legacy crypto) |
 | `YNAY_MCP_INTROSPECTION` | `false` | also accept Kanidm access tokens on `/mcp` via RFC 7662 introspection |
+| `YNAY_MCP_TOKEN_AUDIENCES` | client id | comma separated Kanidm client ids whose access tokens `/mcp` accepts |
 | `YNAY_AGENT_PROVIDER` | `anthropic` | `anthropic` or `openai` (any OpenAI-compatible server: Ollama, llama.cpp, vLLM) |
 | `YNAY_AGENT_API_KEY` | – | API key; agent is disabled when unset (except `openai` with a local base URL) |
 | `YNAY_AGENT_MODEL` | provider default | model id |
