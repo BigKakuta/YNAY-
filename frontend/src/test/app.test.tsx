@@ -110,6 +110,23 @@ describe('App', () => {
     expect(screen.queryByText('Uncategorized')).not.toBeInTheDocument();
   });
 
+  it('links to the register only for imports that created transactions', async () => {
+    const user = userEvent.setup();
+    Element.prototype.scrollTo ??= () => {}; // not implemented by jsdom
+    const b = household();
+    renderAt(`/budgets/${b.id}/import`);
+    const send = async () => {
+      await user.selectOptions(await screen.findByLabelText('Import into account'), 'Account: Wallet');
+      await user.type(screen.getByLabelText('Message'), '2026-01-20, Kiosk, -4.50');
+      await user.click(screen.getByRole('button', { name: /send/i }));
+    };
+    await send();
+    expect(await screen.findByRole('link', { name: /review 1 imported transaction in wallet/i }, { timeout: 3000 })).toBeInTheDocument();
+    await send(); // same line again: a duplicate, nothing new to review
+    await waitFor(() => expect(screen.getAllByText('import_transactions')).toHaveLength(2), { timeout: 3000 });
+    expect(screen.getAllByRole('link', { name: /review .* imported/i })).toHaveLength(1);
+  });
+
   // update_* actions treat null as "unchanged"; clearing a text field has to send "".
   const lastBody = (action: string) => {
     const call = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith(`/api/actions/${action}`)).at(-1);
