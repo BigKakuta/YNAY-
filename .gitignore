@@ -42,3 +42,6 @@ result-*
 
 # Claude Code subagent worktrees
 .claude/worktrees/
+
+# Throwaway Kanidm from deploy/kanidm/dev-kanidm.sh
+.kanidm-dev/
