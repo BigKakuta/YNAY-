@@ -1,7 +1,9 @@
 package io.ynay.account;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.ynay.action.ActionException;
 import io.ynay.action.ActionException.Code;
 import io.ynay.budget.LedgerTestSupport;
 import io.ynay.category.CategoryDto;
@@ -36,6 +38,16 @@ class AccountActionsTest extends LedgerTestSupport {
                 .filter(g -> g.systemKind() == CategoryGroupDto.SystemKind.CREDIT_CARD_PAYMENTS)
                 .findFirst()
                 .orElseThrow();
+    }
+
+    @Test
+    void closingAccountWithBalanceIsRejectedWithReadableAmount() {
+        AccountDto checking = account(budgetId, "Checking", AccountType.CHECKING, 300_200_000);
+
+        assertThatThrownBy(() -> accounts.updateAccount(new AccountActions.UpdateAccountInput(budgetId,
+                checking.id(), null, null, true)))
+                .isInstanceOf(ActionException.class)
+                .hasMessageContaining("has a balance of 300200.00 (300200000 milliunits)");
     }
 
     @Test

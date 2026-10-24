@@ -160,7 +160,7 @@ function MonthView({ month }: { month: string }) {
               <tr>
                 <th>Category</th>
                 <th className="num">Assigned</th>
-                <th className="num">Activity</th>
+                <th className="num col-activity">Activity</th>
                 <th className="num">Available</th>
               </tr>
             </thead>
@@ -198,7 +198,7 @@ function MonthView({ month }: { month: string }) {
               <tr className="group-row">
                 <td>Total</td>
                 <td className="num"><Money value={data.assigned} currency={currency} /></td>
-                <td className="num"><Money value={data.activity} currency={currency} /></td>
+                <td className="num col-activity"><Money value={data.activity} currency={currency} /></td>
                 <td className="num"><Money value={data.available} currency={currency} /></td>
               </tr>
             </tfoot>
@@ -283,7 +283,7 @@ function GroupRows(props: {
           </div>
         </td>
         <td className="num"><Money value={g.assigned} currency={currency} signColor={false} /></td>
-        <td className="num"><Money value={g.activity} currency={currency} signColor={false} /></td>
+        <td className="num col-activity"><Money value={g.activity} currency={currency} signColor={false} /></td>
         <td className="num"><Money value={g.available} currency={currency} signColor={false} /></td>
       </tr>
       {props.adding && (
@@ -307,7 +307,7 @@ function GroupRows(props: {
             <td className="num">
               <AssignInput value={c.assigned} currency={currency} label={`Assigned to ${c.name}`} onCommit={(v) => props.onAssign(c.categoryId, v)} />
             </td>
-            <td className="num">
+            <td className="num col-activity">
               <Money value={c.activity} currency={currency} signColor={false} className={c.activity === 0 ? 'zero' : ''} />
             </td>
             <td className="num">

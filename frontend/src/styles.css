@@ -466,9 +466,7 @@ kbd {
   }
   .mobile-bar button { background: none; border: none; color: inherit; cursor: pointer; padding: 6px; display: grid; }
   .main { height: auto; overflow: visible; }
-  .page-scroll,
-  .month-layout > .table-wrap { overflow: visible; }
-  .month-layout { display: block; }
+  .page-scroll { overflow: visible; }
   .chat-layout { height: calc(100vh - 48px - 74px); }
 }
 
@@ -678,6 +676,13 @@ tr.cat-row:hover .assign-input { border-color: var(--border-strong); background:
   .field-row { grid-template-columns: 1fr; }
   .report-grid { grid-template-columns: 1fr; }
   .btable .num { width: auto; }
+  /* Phones: keep Category | Assigned | Available on screen; activity is in the category panel. */
+  .btable { table-layout: fixed; }
+  .btable .col-activity { display: none; }
+  .btable td, .btable th { padding-left: 8px; padding-right: 8px; }
+  .btable .num { width: 108px; }
+  .btable .num .input { width: 100%; }
+  .btable td:first-child { overflow: hidden; text-overflow: ellipsis; }
   .rta-amount { font-size: var(--fs-2xl); }
 }
 .msg > .btn { align-self: flex-start; }

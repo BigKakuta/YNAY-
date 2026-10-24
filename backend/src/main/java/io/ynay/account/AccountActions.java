@@ -137,7 +137,8 @@ public class AccountActions {
         if (in.closed() != null && in.closed() != account.closed()) {
             if (in.closed() && account.balance() != 0) {
                 throw ActionException.invalid("Account '" + account.name() + "' has a balance of "
-                        + account.balance() + " milliunits; bring it to 0 (e.g. with a transfer) before closing");
+                        + Inputs.formatAmount(account.balance()) + " (" + account.balance()
+                        + " milliunits); bring it to 0 (e.g. with a transfer) before closing");
             }
             jdbc.sql("update account set closed = ? where id = ?").params(in.closed(), account.id()).update();
             categories.setLinkedCategoryHidden(account.id(), in.closed());
