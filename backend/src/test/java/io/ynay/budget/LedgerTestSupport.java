@@ -70,18 +70,18 @@ public abstract class LedgerTestSupport extends IntegrationTest {
 
     protected TransactionDto spend(UUID budgetId, UUID accountId, LocalDate date, long amount, String payee,
                                    UUID categoryId) {
-        return transactions.createTransaction(new TransactionActions.CreateTransactionInput(budgetId, accountId, date,
+        return transactions.createTransaction(new TransactionActions.CreateTransactionInput(budgetId, accountId, date, null,
                 amount, null, payee, categoryId, null, null, null, null, null, null, null));
     }
 
     protected TransactionDto transfer(UUID budgetId, UUID fromAccountId, UUID toAccountId, LocalDate date, long amount,
                                       UUID categoryId) {
         return transactions.createTransaction(new TransactionActions.CreateTransactionInput(budgetId, fromAccountId,
-                date, amount, null, null, categoryId, null, null, null, null, toAccountId, null, null));
+                date, null, amount, null, null, categoryId, null, null, null, null, toAccountId, null, null));
     }
 
     protected TransactionDto split(UUID budgetId, UUID accountId, long amount, List<SplitInput> splits) {
-        return transactions.createTransaction(new TransactionActions.CreateTransactionInput(budgetId, accountId, D1,
+        return transactions.createTransaction(new TransactionActions.CreateTransactionInput(budgetId, accountId, D1, null,
                 amount, null, "Costco", null, null, null, null, null, null, splits, null));
     }
 
@@ -93,6 +93,7 @@ public abstract class LedgerTestSupport extends IntegrationTest {
     protected static final class Upd {
         public UUID accountId;
         public LocalDate date;
+        public String time;
         public Long amount;
         public UUID payeeId;
         public String payeeName;
@@ -111,7 +112,7 @@ public abstract class LedgerTestSupport extends IntegrationTest {
         Upd u = new Upd();
         change.accept(u);
         return transactions.updateTransaction(new TransactionActions.UpdateTransactionInput(budgetId, transactionId,
-                u.accountId, u.date, u.amount, u.payeeId, u.payeeName, u.categoryId, u.memo, u.cleared, u.approved,
+                u.accountId, u.date, u.time, u.amount, u.payeeId, u.payeeName, u.categoryId, u.memo, u.cleared, u.approved,
                 u.flagColor, u.transferAccountId, u.splits, u.importId, u.clearCategory));
     }
 

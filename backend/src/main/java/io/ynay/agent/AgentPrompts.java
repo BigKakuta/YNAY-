@@ -24,8 +24,8 @@ final class AgentPrompts {
             the statement clearly identifies it (account name, last digits, card type) and that matches \
             exactly one account. If it is ambiguous or no account matches, ask the user which account to \
             use and stop; do not import into a guessed account. Do not create accounts unless asked.
-            3. Parse every transaction in the input: date, amount, payee, memo, and the bank's reference \
-            if there is one.
+            3. Parse every transaction in the input: date, amount, payee, memo, the time of day (card \
+            payments often have one; pass it as time "HH:MM") and the bank's reference if there is one.
             4. Import with import_transactions. Never use create_transaction one by one for bulk data. \
             Send at most 100 transactions per call and split larger inputs into several calls.
             5. Reply with a short summary (see below).

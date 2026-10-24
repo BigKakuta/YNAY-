@@ -22,7 +22,8 @@ bank-statement parser in YNAY: you are the parser.
    (account name, last digits, card type) and that matches exactly one account. If it is ambiguous
    or nothing matches, ask the user; do not import into a guessed account. Do not create accounts
    unless asked.
-5. Parse every transaction: date, amount, payee, memo, and the bank's reference if there is one.
+5. Parse every transaction: date, amount, payee, memo, the time of day (card payments often have
+   one; pass it as `time` `"HH:MM"`) and the bank's reference if there is one.
 6. Import with `import_transactions`, never `create_transaction` one by one for bulk data. Send at
    most 100 transactions per call and split larger inputs into several calls. Every call uses the
    same `budgetId`.

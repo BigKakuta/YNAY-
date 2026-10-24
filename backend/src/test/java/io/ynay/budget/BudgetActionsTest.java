@@ -99,7 +99,7 @@ class BudgetActionsTest extends LedgerTestSupport {
                 () -> categories.listCategories(new CategoryActions.ListCategoriesInput(budgetId, null)));
         assertCode(Code.NOT_FOUND, () -> payees.listPayees(new PayeeActions.ListPayeesInput(budgetId)));
         assertCode(Code.NOT_FOUND, () -> transactions.listTransactions(new TransactionActions.ListTransactionsInput(
-                budgetId, null, null, null, null, null, null, null, null, null)));
+                budgetId, null, null, null, null, null, null, null, null, null, null)));
         assertCode(Code.NOT_FOUND, () -> spend(budgetId, accountId, D1, -100, "x", groceries));
 
         // ids of the foreign budget can't be smuggled into an own budget either

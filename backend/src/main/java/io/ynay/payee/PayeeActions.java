@@ -102,6 +102,12 @@ public class PayeeActions {
                             where s.transaction_id = t.id and t.budget_id = ? and s.payee_id = ?""")
                     .params(target.id(), in.budgetId(), id)
                     .update();
+            // the target keeps its own subscription, or takes over the first source's
+            jdbc.sql("""
+                            update payee set subscription_id = (select subscription_id from payee where id = ?)
+                            where id = ? and subscription_id is null""")
+                    .params(id, target.id())
+                    .update();
             jdbc.sql("delete from payee where budget_id = ? and id = ?").params(in.budgetId(), id).update();
         }
         return target;

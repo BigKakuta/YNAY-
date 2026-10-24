@@ -32,13 +32,13 @@ class TransactionActionsTest extends LedgerTestSupport {
                                          LocalDate until, String search, Boolean unapproved, Integer limit,
                                          Integer offset) {
         return transactions.listTransactions(new TransactionActions.ListTransactionsInput(budgetId, accountId,
-                categoryId, payeeId, since, until, search, unapproved, limit, offset));
+                categoryId, payeeId, since, until, search, unapproved, null, limit, offset));
     }
 
     @Test
     void createAndGetTransaction() {
         TransactionDto t = transactions.createTransaction(new TransactionActions.CreateTransactionInput(budgetId,
-                checking, D1, -12_340L, null, "  Whole Foods ", groceries, "weekly shop", Cleared.CLEARED, null,
+                checking, D1, null, -12_340L, null, "  Whole Foods ", groceries, "weekly shop", Cleared.CLEARED, null,
                 FlagColor.RED, null, null, "bank-1"));
 
         assertThat(t.budgetId()).isEqualTo(budgetId);
@@ -59,14 +59,29 @@ class TransactionActionsTest extends LedgerTestSupport {
         assertThat(txn(budgetId, t.id())).isEqualTo(t);
 
         assertCode(Code.CONFLICT, () -> transactions.createTransaction(new TransactionActions.CreateTransactionInput(
-                budgetId, checking, D1, -1L, null, null, null, null, null, null, null, null, null, "bank-1")));
+                budgetId, checking, D1, null, -1L, null, null, null, null, null, null, null, null, null, "bank-1")));
         assertCode(Code.INVALID_INPUT, () -> transactions.createTransaction(
-                new TransactionActions.CreateTransactionInput(budgetId, checking, null, -1L, null, null, null, null,
+                new TransactionActions.CreateTransactionInput(budgetId, checking, null, null, -1L, null, null, null, null,
                         null, null, null, null, null, null)));
         assertCode(Code.INVALID_INPUT, () -> transactions.createTransaction(
-                new TransactionActions.CreateTransactionInput(budgetId, checking, D1, null, null, null, null, null,
+                new TransactionActions.CreateTransactionInput(budgetId, checking, D1, null, null, null, null, null, null,
                         null, null, null, null, null, null)));
         assertCode(Code.NOT_FOUND, () -> txn(budgetId, UUID.randomUUID()));
+    }
+
+    @Test
+    void timeOfDay() {
+        TransactionDto t = transactions.createTransaction(new TransactionActions.CreateTransactionInput(budgetId,
+                checking, D1, "9:05", -1_000L, null, "Bakery", groceries, null, null, null, null, null, null, null));
+        assertThat(t.time()).isEqualTo("09:05");
+        assertThat(updateTxn(budgetId, t.id(), x -> x.memo = "rolls").time()).isEqualTo("09:05");
+        assertThat(updateTxn(budgetId, t.id(), x -> x.time = "18:30:59").time()).isEqualTo("18:30");
+        assertThat(updateTxn(budgetId, t.id(), x -> x.time = "").time()).isNull();
+        assertCode(Code.INVALID_INPUT, () -> updateTxn(budgetId, t.id(), x -> x.time = "25:00"));
+        UUID imported = transactions.importTransactions(new TransactionActions.ImportTransactionsInput(budgetId,
+                checking, List.of(new ImportLine(D1, "07:45", -2_000L, "Bakery", null, null, null, null)), true))
+                .transactionIds().getFirst();
+        assertThat(txn(budgetId, imported).time()).isEqualTo("07:45");
     }
 
     @Test
@@ -159,11 +174,11 @@ class TransactionActionsTest extends LedgerTestSupport {
         assertCode(Code.INVALID_INPUT, () -> split(budgetId, checking, -10_000, List.of(
                 new SplitInput(-7_000L, groceries, null, null), new SplitInput(-2_000L, dining, null, null))));
         assertCode(Code.INVALID_INPUT, () -> transactions.createTransaction(new TransactionActions.CreateTransactionInput(
-                budgetId, checking, D1, -10_000L, null, null, groceries, null, null, null, null, null,
+                budgetId, checking, D1, null, -10_000L, null, null, groceries, null, null, null, null, null,
                 List.of(new SplitInput(-10_000L, groceries, null, null)), null)));
         UUID savings = account(budgetId, "Savings", AccountType.SAVINGS, 0).id();
         assertCode(Code.INVALID_INPUT, () -> transactions.createTransaction(new TransactionActions.CreateTransactionInput(
-                budgetId, checking, D1, -10_000L, null, null, null, null, null, null, null, savings,
+                budgetId, checking, D1, null, -10_000L, null, null, null, null, null, null, null, savings,
                 List.of(new SplitInput(-10_000L, groceries, null, null)), null)));
         assertCode(Code.INVALID_INPUT, () -> split(budgetId, checking, -10_000, List.of(
                 new SplitInput(-10_000L, null, "Transfer : Savings", null))));
@@ -251,7 +266,7 @@ class TransactionActionsTest extends LedgerTestSupport {
     @Test
     void approveAndClearInBulk() {
         TransactionDto a = transactions.createTransaction(new TransactionActions.CreateTransactionInput(budgetId,
-                checking, D1, -1L, null, "A", null, null, null, false, null, null, null, null));
+                checking, D1, null, -1L, null, "A", null, null, null, false, null, null, null, null));
         TransactionDto b = spend(budgetId, checking, D1, -2L, "B", null);
         assertThat(a.approved()).isFalse();
 

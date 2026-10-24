@@ -9,7 +9,7 @@ import { mockAgentChat } from './agent';
 import { seedState } from './seed';
 import type { MockState } from './state';
 
-const STORAGE_KEY = 'ynay.mock.state.v1';
+const STORAGE_KEY = 'ynay.mock.state.v2';
 const LOGGED_OUT_KEY = 'ynay.mock.loggedOut';
 const AGENT_OFF_KEY = 'ynay.mock.agentOff';
 const CSRF = 'mock-csrf-token';

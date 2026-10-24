@@ -60,6 +60,54 @@ describe('App', () => {
     for (const [, init] of posts) expect((init!.headers as Record<string, string>)['X-XSRF-TOKEN']).toBe('mock-csrf-token');
   });
 
+  it('shows every report tab', async () => {
+    const user = userEvent.setup();
+    const b = household();
+    renderAt(`/budgets/${b.id}/reports`);
+    expect(await screen.findByText('Month by month')).toBeInTheDocument();
+    expect(screen.getByText('Spending by category')).toBeInTheDocument();
+    expect(await screen.findByText('Money flow, per month')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Subscriptions' }));
+    expect(await screen.findByText('Subscriptions running now')).toBeInTheDocument();
+    expect(screen.getAllByText('MusicBox').length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole('tab', { name: 'Spending deep dive' }));
+    expect(await screen.findByText('Per month, by payee')).toBeInTheDocument();
+    expect(screen.getByText('What time you pay')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Purchases' }));
+    expect(await screen.findByText('Things, month by month')).toBeInTheDocument();
+    expect(await screen.findByText('ShopMart Online, item by item')).toBeInTheDocument();
+    expect(screen.getByText('Purchase review, in hindsight')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Planning' }));
+    expect(await screen.findByText('What you could invest')).toBeInTheDocument();
+    expect(screen.getByText('Tech replacement budget')).toBeInTheDocument();
+    expect(screen.getByText('When could you stop working?')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Transactions' }));
+    expect(await screen.findByLabelText('Search transactions')).toBeInTheDocument();
+  });
+
+  it('rates purchases and edits the device list', async () => {
+    const user = userEvent.setup();
+    const b = household();
+    renderAt(`/budgets/${b.id}/reports/purchases`);
+    const group = await screen.findByRole('group', { name: 'Rate Wireless earbuds' });
+    await user.click(within(group).getByRole('button', { name: 'Rate 2' }));
+    await waitFor(() => expect(within(screen.getByRole('group', { name: 'Rate Wireless earbuds' })).getByRole('button', { name: 'Rate 2' })).toHaveAttribute('aria-pressed', 'true'));
+    expect(backend.state.reviews.some((r) => r.rating === 2)).toBe(true);
+
+    await user.click(screen.getByRole('tab', { name: 'Planning' }));
+    await user.type(await screen.findByLabelText('New device name'), 'E-reader');
+    await user.type(screen.getByLabelText('New device price'), '250');
+    await user.click(screen.getByRole('button', { name: 'Add device' }));
+    expect(await screen.findByText('E-reader')).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Include E-reader'));
+    await waitFor(() => expect(backend.state.devices.find((d) => d.name === 'E-reader')?.active).toBe(false));
+  });
+
   it('assigns money inline and updates Ready to Assign', async () => {
     const user = userEvent.setup();
     const b = household();

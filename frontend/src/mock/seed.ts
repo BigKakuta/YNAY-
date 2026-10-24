@@ -25,8 +25,11 @@ export function seedState(): MockState {
   const brokerage = acct('Brokerage', 'ASSET', 15_400_000);
   const carLoan = acct('Car loan', 'LOAN', -9_800_000);
 
-  const bills = run<CategoryGroup[]>('list_categories', { budgetId: b }).find((g) => g.name === 'Bills')!;
+  const initial = run<CategoryGroup[]>('list_categories', { budgetId: b });
+  const bills = initial.find((g) => g.name === 'Bills')!;
   run('create_category', { budgetId: b, groupId: bills.id, name: 'Car Payment' });
+  run('create_category', { budgetId: b, groupId: initial.find((g) => g.name === 'Wants')!.id, name: 'Electronics' });
+  run('create_category', { budgetId: b, groupId: initial.find((g) => g.name === 'Savings')!.id, name: 'Investing' });
   const groups = run<CategoryGroup[]>('list_categories', { budgetId: b });
   const cat = (name: string) => groups.flatMap((g) => g.categories).find((c) => c.name === name)!.id;
   const rta = cat('Inflow: Ready to Assign');
@@ -58,6 +61,8 @@ export function seedState(): MockState {
     ['Shopping', 120_000],
     ['Emergency Fund', 400_000],
     ['Vacation', 250_000],
+    ['Investing', 300_000],
+    ['Electronics', 60_000],
     ['Visa', 0],
   ];
 
@@ -76,8 +81,24 @@ export function seedState(): MockState {
     // Groceries, weekly-ish on the card
     const groceryDays = current ? [3, 10, 17] : [3, 10, 17, 24];
     groceryDays.forEach((d, i) =>
-      txn(visa.id, dayIn(offset, d), -(96_000 + ((i * 37 + offset * 13) % 50) * 1_000 + 470), i % 2 ? 'Green Market' : 'FreshCo', 'Groceries', current && i === 2 ? extra : {}),
+      txn(visa.id, dayIn(offset, d), -(96_000 + ((i * 37 + offset * 13) % 50) * 1_000 + 470), i % 2 ? 'Green Market' : 'FreshCo', 'Groceries', {
+        time: `${17 + (i % 3)}:${String((i * 17 + 5) % 60).padStart(2, '0')}`,
+        ...(current && i === 2 ? extra : {}),
+      }),
     );
+    // Small top-up shops and the bakery, with card times
+    const smallDays = current ? [2, 6, 9, 13, 16] : [2, 6, 9, 13, 16, 20, 23, 27];
+    smallDays.forEach((d, i) => {
+      if (dayIn(offset, d) !== `${addMonths(currentMonth(), offset)}-${String(d).padStart(2, '0')}`) return;
+      txn(cash.id, dayIn(offset, d), -(4_200 + ((i * 53 + offset * 7) % 40) * 250), 'Corner Bakery', 'Groceries', { time: `0${7 + (i % 2)}:${String((i * 11) % 60).padStart(2, '0')}` });
+      if (i % 2 === 0) txn(visa.id, dayIn(offset, d), -(12_000 + ((i * 29) % 30) * 500), 'FreshCo', 'Groceries', { time: `12:${String((i * 7) % 60).padStart(2, '0')}` });
+    });
+    // Subscriptions
+    txn(visa.id, dayIn(offset, 3), -10_990, 'MusicBox', 'Entertainment');
+    txn(visa.id, dayIn(offset, 14), -20_000, 'AI Assistant', 'Entertainment');
+    if (offset <= -2) txn(visa.id, dayIn(offset, 22), -12_990, 'GameStream', 'Entertainment');
+    // Investing: on-budget → tracking asset account counts as saving
+    if (!current || new Date().getDate() >= 25) txn(checking.id, dayIn(offset, 25), -300_000, '', 'Investing', { transferAccountId: brokerage.id, payeeName: undefined, memo: 'Index fund savings plan' });
     txn(visa.id, dayIn(offset, 5), -54_300, 'Shell', 'Transportation');
     txn(visa.id, dayIn(offset, 19), -48_900, 'Shell', 'Transportation', current ? extra : {});
     txn(visa.id, dayIn(offset, 7), -38_500, 'Luigi’s Trattoria', 'Dining Out');
@@ -98,6 +119,25 @@ export function seedState(): MockState {
       if (value) run('assign_to_category', { budgetId: b, month, categoryId: cat(name), assigned: value });
     }
   }
+  // Online orders, item by item
+  run('create_transaction', {
+    budgetId: b,
+    accountId: visa.id,
+    date: dayIn(-2, 9),
+    amount: -208_890,
+    payeeName: 'ShopMart Online',
+    cleared: 'CLEARED',
+    splits: [
+      { amount: -129_000, categoryId: cat('Electronics'), memo: 'Wireless earbuds' },
+      { amount: -39_900, categoryId: cat('Shopping'), memo: 'Desk lamp' },
+      { amount: -12_990, categoryId: cat('Groceries'), memo: 'Coffee beans' },
+      { amount: -27_000, categoryId: cat('Shopping'), memo: 'Bath towels (2)' },
+    ],
+  });
+  txn(visa.id, dayIn(-1, 12), -34_990, 'ShopMart Online', 'Electronics', { memo: 'USB-C dock' });
+  txn(visa.id, dayIn(-1, 18), -18_490, 'ShopMart Online', 'Shopping', { memo: 'Paperback: Deep Work' });
+  txn(visa.id, dayIn(0, 4), -89_000, 'ShopMart Online', 'Electronics', { memo: 'Noise-cancelling headphones' });
+  txn(visa.id, dayIn(-3, 15), -99_000, 'CloudDrive', 'Entertainment', { memo: 'Yearly plan' });
   // A split transaction
   run('create_transaction', {
     budgetId: b,
@@ -135,6 +175,43 @@ export function seedState(): MockState {
   target('Vacation', 'TARGET_BALANCE_BY_DATE', 2_400_000, `${addMonths(currentMonth(), 6)}-01`);
   target('Dining Out', 'MONTHLY_SAVINGS', 200_000);
   run('update_category', { budgetId: b, categoryId: cat('Medical'), note: 'Co-pays and prescriptions' });
+
+  // Subscriptions and fixed contracts
+  const payeeId = (name: string) => s.payees.find((p) => p.budgetId === b && p.name === name)!.id;
+  const sub = (name: string, payee: string, extra: object = {}) =>
+    run('create_subscription', { budgetId: b, name, payeeIds: [payeeId(payee)], ...extra });
+  sub('StreamFlix', 'StreamFlix', { groupName: 'Media' });
+  sub('MusicBox', 'MusicBox', { groupName: 'Media' });
+  sub('AI Assistant', 'AI Assistant', { groupName: 'AI', note: 'Pro plan; check the cheaper tier' });
+  sub('CloudDrive', 'CloudDrive', { groupName: 'Digital', cadence: 'YEARLY' });
+  sub('GameStream', 'GameStream', { groupName: 'Games', cancelledOn: dayIn(-1, 1) });
+  sub('Rent', 'Parkside Apartments', { kind: 'FIXED', groupName: 'Home' });
+  sub('Power & water', 'City Power & Water', { kind: 'FIXED', groupName: 'Home' });
+  sub('Mobile phone', 'Mobile Co', { kind: 'FIXED', groupName: 'Home' });
+  sub('Internet', 'FiberNet', { kind: 'FIXED', groupName: 'Home' });
+  sub('Home insurance', 'SafeHome Insurance', { kind: 'FIXED', groupName: 'Insurance' });
+  // Devices for the replacement budget
+  const device = (name: string, price: number, purchasedOn: string, lifespanYears: number) =>
+    run('create_device', { budgetId: b, name, price, purchasedOn, lifespanYears });
+  device('Laptop', 1_899_000, `${addMonths(currentMonth(), -20)}-10`, 5);
+  device('Phone', 899_000, `${addMonths(currentMonth(), -9)}-02`, 4);
+  device('TV', 1_150_000, `${addMonths(currentMonth(), -38)}-21`, 8);
+  device('Wireless earbuds', 129_000, dayIn(-2, 9), 3);
+  // Report settings and a purchase review
+  run('update_report_settings', {
+    budgetId: b,
+    settings: {
+      thingsCategoryIds: [cat('Shopping'), cat('Electronics')],
+      thingsMonthlyTarget: 250_000,
+      focusCategoryIds: [cat('Groceries')],
+      focusPayeeId: payeeId('ShopMart Online'),
+      reviewMinAmount: 20_000,
+      grossSalaryPerYear: 78_000_000,
+      salaryPayeeId: payeeId('Acme Corp Payroll'),
+    },
+  });
+  const dock = s.txns.find((t) => t.memo === 'USB-C dock')!;
+  run('review_purchase', { budgetId: b, transactionId: dock.id, rating: 4 });
 
   // Park the opening balances in the emergency fund so Ready to Assign shows a realistic remainder.
   const first = addMonths(currentMonth(), -3);

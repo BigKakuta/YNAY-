@@ -61,8 +61,8 @@ class LedgerJsonShapeTest extends LedgerTestSupport {
         TransactionDto t = split(budgetId, account.id(), -2_000, List.of(
                 new SplitInput(-1_000L, groceries, null, null), new SplitInput(-1_000L, null, "Other", "m")));
         JsonNode txnJson = json.valueToTree(t);
-        assertThat(fields(t)).containsExactlyInAnyOrder("id", "budgetId", "accountId", "accountName", "date", "amount",
-                "payeeId", "payeeName", "categoryId", "categoryName", "memo", "cleared", "approved", "flagColor",
+        assertThat(fields(t)).containsExactlyInAnyOrder("id", "budgetId", "accountId", "accountName", "date", "time",
+                "amount", "payeeId", "payeeName", "categoryId", "categoryName", "memo", "cleared", "approved", "flagColor",
                 "transferAccountId", "transferTransactionId", "importId", "splits");
         assertThat(txnJson.get("date").asString()).isEqualTo("2026-10-01");
         assertThat(txnJson.get("amount").asLong()).isEqualTo(-2_000);
@@ -70,7 +70,7 @@ class LedgerJsonShapeTest extends LedgerTestSupport {
                 "categoryName", "payeeId", "payeeName", "memo");
 
         assertThat(fields(transactions.listTransactions(new TransactionActions.ListTransactionsInput(budgetId, null,
-                null, null, null, null, null, null, null, null)))).containsExactlyInAnyOrder("transactions", "total");
+                null, null, null, null, null, null, null, null, null)))).containsExactlyInAnyOrder("transactions", "total");
         assertThat(fields(transactions.importTransactions(new TransactionActions.ImportTransactionsInput(budgetId,
                 account.id(), List.of(), null)))).containsExactlyInAnyOrder("imported", "duplicates", "transactionIds",
                 "duplicateImportIds");

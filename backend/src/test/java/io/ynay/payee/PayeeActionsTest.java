@@ -100,7 +100,7 @@ class PayeeActionsTest extends LedgerTestSupport {
         assertCode(Code.NOT_FOUND, () -> payees.updatePayee(new PayeeActions.UpdatePayeeInput(other, shop, "X")));
         UUID otherAccount = account(other, "Other", AccountType.CHECKING, 0).id();
         assertCode(Code.NOT_FOUND, () -> transactions.createTransaction(
-                new io.ynay.transaction.TransactionActions.CreateTransactionInput(other, otherAccount, D1, -1L, shop,
+                new io.ynay.transaction.TransactionActions.CreateTransactionInput(other, otherAccount, D1, null, -1L, shop,
                         null, null, null, null, null, null, null, null, null)));
     }
 }

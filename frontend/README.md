@@ -55,7 +55,7 @@ State is kept in `sessionStorage`. URL switches: `?mock-reset` (reseed), `?mock-
 ## Routes
 
 `/` budgets · `/settings` profile & MCP tokens · `/budgets/:id/budget/:month` · `/budgets/:id/accounts` (all) ·
-`/budgets/:id/accounts/:accountId` · `/budgets/:id/reports` · `/budgets/:id/import` · `/budgets/:id/settings`.
+`/budgets/:id/accounts/:accountId` · `/budgets/:id/reports/:tab?` (overview, subscriptions, spending, purchases, planning, transactions) · `/budgets/:id/import` · `/budgets/:id/settings`.
 The backend forwards unknown paths to `index.html`.
 
 Keyboard: in the budget, <kbd>Enter</kbd> saves an Assigned cell and moves to the next one, <kbd>Esc</kbd> reverts,

@@ -95,6 +95,8 @@ export type Transaction = {
   accountId: Uuid;
   accountName: string;
   date: IsoDate;
+  /** Local time of day (HH:MM) when the bank export had it. */
+  time: string | null;
   amount: Milliunits;
   payeeId: Uuid | null;
   payeeName: string | null;
@@ -161,6 +163,7 @@ export type SplitInput = { amount: Milliunits; categoryId?: Uuid | null; payeeNa
 
 export type ImportLine = {
   date: IsoDate;
+  time?: string;
   amount: Milliunits;
   payeeName?: string;
   memo?: string;
@@ -172,6 +175,8 @@ export type ImportLine = {
 export type TransactionFields = {
   accountId: Uuid;
   date: IsoDate;
+  /** HH:MM; "" clears it on update. */
+  time?: string | null;
   amount: Milliunits;
   payeeId?: Uuid | null;
   payeeName?: string | null;
@@ -191,6 +196,114 @@ export type SpendingRow = { categoryId: Uuid; categoryName: string; groupName: s
 export type SpendingReport = { rows: SpendingRow[]; total: Milliunits };
 export type IncomeExpenseRow = { month: IsoMonth; income: Milliunits; expense: Milliunits; net: Milliunits };
 export type NetWorthRow = { month: IsoMonth; assets: Milliunits; liabilities: Milliunits; netWorth: Milliunits };
+
+export type FlowKind = 'INCOME' | 'SPENDING' | 'SAVING';
+/** Amounts are positive in their own direction: income received, money spent, money put into savings. */
+export type CashFlowMonth = { month: IsoMonth; income: Milliunits; spending: Milliunits; saving: Milliunits; subscriptions: Milliunits };
+export type CashFlowRow = {
+  month: IsoMonth;
+  kind: FlowKind;
+  categoryId: Uuid | null;
+  categoryName: string | null;
+  groupId: Uuid | null;
+  groupName: string | null;
+  payeeId: Uuid | null;
+  payeeName: string | null;
+  subscriptionId: Uuid | null;
+  /** SAVING: the tracking account the money went to or came from. */
+  accountId: Uuid | null;
+  accountName: string | null;
+  amount: Milliunits;
+  count: number;
+};
+export type CashFlow = { months: CashFlowMonth[]; rows: CashFlowRow[] };
+
+export type PurchaseReview = { rating: number | null; sensibleReason: string | null };
+/** One spending line (transaction or split line); amount is positive when spent, negative for a refund. */
+export type Payment = {
+  transactionId: Uuid;
+  splitId: Uuid | null;
+  date: IsoDate;
+  time: string | null;
+  accountId: Uuid;
+  accountName: string;
+  payeeId: Uuid | null;
+  payeeName: string | null;
+  categoryId: Uuid | null;
+  categoryName: string | null;
+  groupName: string | null;
+  memo: string | null;
+  amount: Milliunits;
+  subscriptionId: Uuid | null;
+  review: PurchaseReview | null;
+};
+export type PaymentsQuery = {
+  fromMonth?: IsoMonth;
+  toMonth?: IsoMonth;
+  categoryIds?: Uuid[];
+  payeeIds?: Uuid[];
+  search?: string;
+  minAmount?: Milliunits;
+  limit?: number;
+};
+
+export type SubscriptionKind = 'SUBSCRIPTION' | 'FIXED';
+export type Cadence = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+export type SubscriptionStatus = 'ACTIVE' | 'OVERDUE' | 'ENDED';
+export type Subscription = {
+  id: Uuid;
+  name: string;
+  kind: SubscriptionKind;
+  cadence: Cadence;
+  groupName: string | null;
+  note: string | null;
+  variable: boolean;
+  cancelledOn: IsoDate | null;
+  payees: { id: Uuid; name: string }[];
+  status: SubscriptionStatus;
+  chargeCount: number;
+  firstCharge: IsoDate | null;
+  lastCharge: IsoDate | null;
+  lastAmount: Milliunits;
+  previousAmount: Milliunits | null;
+  monthlyCost: Milliunits;
+  last12Months: Milliunits;
+  nextCharge: IsoDate | null;
+};
+export type SubscriptionFields = {
+  name: string;
+  kind?: SubscriptionKind;
+  cadence?: Cadence;
+  groupName?: string | null;
+  note?: string | null;
+  variable?: boolean;
+  payeeIds?: Uuid[];
+  cancelledOn?: IsoDate | null;
+};
+
+export type Device = {
+  id: Uuid;
+  name: string;
+  price: Milliunits;
+  purchasedOn: IsoDate;
+  lifespanYears: number;
+  active: boolean;
+  note: string | null;
+  monthlyCost: Milliunits;
+  replaceOn: IsoDate;
+};
+export type DeviceFields = { name: string; price: Milliunits; purchasedOn: IsoDate; lifespanYears: number; active?: boolean; note?: string | null };
+
+/** null = not set; the Reports page falls back to its defaults. */
+export type ReportSettings = {
+  thingsCategoryIds: Uuid[] | null;
+  thingsMonthlyTarget: Milliunits | null;
+  focusCategoryIds: Uuid[] | null;
+  focusPayeeId: Uuid | null;
+  reviewMinAmount: Milliunits | null;
+  grossSalaryPerYear: Milliunits | null;
+  salaryPayeeId: Uuid | null;
+};
 
 type B = { budgetId: Uuid };
 type Deleted = { deleted: true };
@@ -250,6 +363,7 @@ export interface Actions {
       untilDate?: IsoDate;
       search?: string;
       unapprovedOnly?: boolean;
+      subscriptionsOnly?: boolean;
       limit?: number;
       offset?: number;
     },
@@ -283,6 +397,24 @@ export interface Actions {
   report_spending_by_category: [B & { fromMonth: IsoMonth; toMonth: IsoMonth }, SpendingReport];
   report_income_vs_expense: [B & { fromMonth: IsoMonth; toMonth: IsoMonth }, IncomeExpenseRow[]];
   report_net_worth: [B & { fromMonth: IsoMonth; toMonth: IsoMonth }, NetWorthRow[]];
+  report_cash_flow: [B & { fromMonth: IsoMonth; toMonth: IsoMonth }, CashFlow];
+  report_payments: [B & PaymentsQuery, { payments: Payment[]; truncated: boolean }];
+  review_purchase: [
+    B & { transactionId: Uuid; splitId?: Uuid | null; rating?: number | null; sensibleReason?: string | null; clear?: boolean },
+    { transactionId: Uuid; splitId: Uuid | null; rating: number | null; sensibleReason: string | null } | { cleared: true },
+  ];
+  get_report_settings: [B, ReportSettings];
+  update_report_settings: [B & { settings: ReportSettings }, ReportSettings];
+
+  list_subscriptions: [B & { asOf?: IsoDate }, Subscription[]];
+  create_subscription: [B & SubscriptionFields, Subscription];
+  update_subscription: [B & { subscriptionId: Uuid; reactivate?: boolean } & Partial<SubscriptionFields>, Subscription];
+  delete_subscription: [B & { subscriptionId: Uuid }, Deleted];
+
+  list_devices: [B, Device[]];
+  create_device: [B & DeviceFields, Device];
+  update_device: [B & { deviceId: Uuid } & Partial<DeviceFields>, Device];
+  delete_device: [B & { deviceId: Uuid }, Deleted];
 }
 
 export type ActionName = keyof Actions;

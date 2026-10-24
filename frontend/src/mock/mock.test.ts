@@ -112,6 +112,37 @@ describe('mock month math', () => {
   });
 });
 
+describe('mock reports', () => {
+  it('classifies cash flow like the backend and derives subscription figures', () => {
+    const { run, b, cat } = setup();
+    const checking = run<Account>('create_account', { budgetId: b, name: 'Checking', type: 'CHECKING', startingBalance: 1_000_000, startingDate: '2026-01-01' });
+    const depot = run<Account>('create_account', { budgetId: b, name: 'Depot', type: 'ASSET', startingBalance: 0, startingDate: '2026-01-01' });
+    const txn = (date: string, amount: number, payeeName: string, categoryName: string | null, extra: object = {}) =>
+      run('create_transaction', { budgetId: b, accountId: checking.id, date, amount, payeeName, categoryId: categoryName ? cat(categoryName) : null, ...extra });
+    txn('2026-01-25', 3_000_000, 'Employer', 'Inflow: Ready to Assign');
+    txn('2026-01-03', -40_000, 'REWE', 'Groceries', { time: '9:05' });
+    txn('2026-01-12', -400_000, '', 'Emergency Fund', { transferAccountId: depot.id, payeeName: undefined });
+    txn('2026-01-20', -9_990, 'Spotify', 'Entertainment');
+    txn('2026-02-20', -9_990, 'Spotify', 'Entertainment');
+    const spotify = run<{ id: string; name: string }[]>('list_payees', { budgetId: b }).find((p) => p.name === 'Spotify')!;
+    run('create_subscription', { budgetId: b, name: 'Spotify', payeeIds: [spotify.id] });
+
+    const flow = run<{ months: { income: number; spending: number; saving: number; subscriptions: number }[] }>('report_cash_flow', {
+      budgetId: b,
+      fromMonth: '2026-01',
+      toMonth: '2026-02',
+    });
+    expect(flow.months[0]).toMatchObject({ income: 3_000_000, spending: 49_990, saving: 400_000, subscriptions: 9_990 });
+    const payments = run<{ payments: { time: string | null; amount: number }[] }>('report_payments', { budgetId: b, categoryIds: [cat('Groceries')] });
+    expect(payments.payments).toEqual([expect.objectContaining({ time: '09:05', amount: 40_000 })]);
+    const [sub] = run<{ chargeCount: number; monthlyCost: number; lastCharge: string; nextCharge: string }[]>('list_subscriptions', {
+      budgetId: b,
+      asOf: '2026-03-01',
+    });
+    expect(sub).toMatchObject({ chargeCount: 2, monthlyCost: 9_990, lastCharge: '2026-02-20', nextCharge: '2026-03-20' });
+  });
+});
+
 describe('mock agent statement parser', () => {
   it('extracts date, payee and amount from CSV and free text', () => {
     expect(parseStatement('Date,Description,Amount\n2026-10-21,Bookshop,-24.90\n22.10.2026;Bakery;-6,40\n10/23/2026 Refund 45.00')).toEqual([

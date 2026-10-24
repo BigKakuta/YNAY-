@@ -4,13 +4,14 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/** {@code Transaction}. Amount in milliunits, negative = outflow. */
+/** {@code Transaction}. Amount in milliunits, negative = outflow; time is the local time of day (HH:MM) or null. */
 public record TransactionDto(
         UUID id,
         UUID budgetId,
         UUID accountId,
         String accountName,
         LocalDate date,
+        String time,
         long amount,
         UUID payeeId,
         String payeeName,
@@ -26,7 +27,7 @@ public record TransactionDto(
         List<SplitDto> splits) {
 
     TransactionDto withSplits(List<SplitDto> splits) {
-        return new TransactionDto(id, budgetId, accountId, accountName, date, amount, payeeId, payeeName, categoryId,
+        return new TransactionDto(id, budgetId, accountId, accountName, date, time, amount, payeeId, payeeName, categoryId,
                 categoryName, memo, cleared, approved, flagColor, transferAccountId, transferTransactionId, importId,
                 splits);
     }

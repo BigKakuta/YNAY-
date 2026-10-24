@@ -19,6 +19,7 @@ import type {
   Transaction,
 } from '../api/types';
 import { addMonths, currentMonth, monthOf, monthRange, todayIso } from '../lib/dates';
+import { createReportHandlers, MockError, parseTime } from './reports';
 import {
   DEFAULT_CATEGORIES,
   uuid,
@@ -29,15 +30,7 @@ import {
   type MTxn,
 } from './state';
 
-export class MockError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+export { MockError };
 
 const notFound = (what: string) => new MockError(404, 'not_found', `${what} not found`);
 const invalid = (msg: string) => new MockError(400, 'invalid', msg);
@@ -51,6 +44,11 @@ type In = any;
 
 export function createHandlers(s: MockState) {
   const now = () => new Date().toISOString();
+  // state saved by an older mock version
+  s.subscriptions ??= [];
+  s.devices ??= [];
+  s.reviews ??= [];
+  s.reportSettings ??= {};
 
   function requireMember(budgetId: string) {
     const m = s.members.find((x) => x.budgetId === budgetId && x.userId === s.meId);
@@ -130,6 +128,7 @@ export function createHandlers(s: MockState) {
       accountId: t.accountId,
       accountName: s.accounts.find((a) => a.id === t.accountId)?.name ?? '',
       date: t.date,
+      time: t.time ?? null,
       amount: t.amount,
       payeeId: t.payeeId,
       payeeName: payee?.name ?? null,
@@ -332,6 +331,7 @@ export function createHandlers(s: MockState) {
       budgetId,
       accountId: account.id,
       date: in_.date,
+      time: parseTime(in_.time),
       amount,
       payeeId,
       categoryId,
@@ -786,6 +786,7 @@ export function createHandlers(s: MockState) {
         .filter((t) => !in_.sinceDate || t.date >= in_.sinceDate)
         .filter((t) => !in_.untilDate || t.date <= in_.untilDate)
         .filter((t) => !in_.unapprovedOnly || !t.approved)
+        .filter((t) => !in_.subscriptionsOnly || [t.payeeId, ...t.splits.map((x) => x.payeeId)].some((id) => s.payees.find((p) => p.id === id)?.subscriptionId))
         .map(txnDto)
         .filter(
           (t) =>
@@ -811,6 +812,7 @@ export function createHandlers(s: MockState) {
       const t = getTxn(in_.budgetId, in_.transactionId);
       if (in_.accountId != null) t.accountId = getAccount(in_.budgetId, in_.accountId).id;
       if (in_.date != null) t.date = in_.date;
+      if (in_.time != null) t.time = parseTime(in_.time);
       if (in_.amount != null) t.amount = Number(in_.amount);
       if (in_.payeeId !== undefined || in_.payeeName !== undefined || in_.transferAccountId !== undefined) {
         const r = resolvePayee(in_.budgetId, t.accountId, in_);
@@ -861,6 +863,7 @@ export function createHandlers(s: MockState) {
         const t = createTxn(in_.budgetId, {
           accountId: account.id,
           date: line.date,
+          time: line.time,
           amount: line.amount,
           payeeName: line.payeeName,
           memo: line.memo,
@@ -924,6 +927,7 @@ export function createHandlers(s: MockState) {
       }
       return { reconciledCount: count, adjustmentTransactionId };
     },
+    ...createReportHandlers(s, requireMember),
 
     get_month_budget: (in_) => {
       requireMember(in_.budgetId);

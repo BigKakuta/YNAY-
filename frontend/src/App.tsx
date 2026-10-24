@@ -56,7 +56,7 @@ export function App() {
             <Route path="budget/:month" element={<BudgetMonthPage />} />
             <Route path="accounts" element={<RegisterPage />} />
             <Route path="accounts/:accountId" element={<RegisterPage />} />
-            <Route path="reports" element={<ReportsPage />} />
+            <Route path="reports/:tab?" element={<ReportsPage />} />
             <Route path="import" element={<ImportPage />} />
             <Route path="settings" element={<BudgetSettingsPage />} />
             <Route path="*" element={<NotFound />} />

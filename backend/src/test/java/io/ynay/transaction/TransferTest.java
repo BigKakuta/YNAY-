@@ -76,14 +76,14 @@ class TransferTest extends LedgerTestSupport {
 
         UUID payeeId = other(byName).payeeId(); // "Transfer : Checking"
         TransactionDto byId = transactions.createTransaction(new TransactionActions.CreateTransactionInput(budgetId,
-                savings, D1, -1_000L, payeeId, null, null, null, null, null, null, null, null, null));
+                savings, D1, null, -1_000L, payeeId, null, null, null, null, null, null, null, null, null));
         assertThat(byId.transferAccountId()).isEqualTo(checking);
         assertThat(other(byId).accountId()).isEqualTo(checking);
 
         assertCode(Code.INVALID_INPUT, () -> spend(budgetId, checking, D1, -1, "Transfer : Nowhere", null));
         assertCode(Code.INVALID_INPUT, () -> transfer(budgetId, checking, checking, D1, -1, null));
         assertCode(Code.INVALID_INPUT, () -> transactions.createTransaction(
-                new TransactionActions.CreateTransactionInput(budgetId, checking, D1, -1L, null, "Transfer : Visa",
+                new TransactionActions.CreateTransactionInput(budgetId, checking, D1, null, -1L, null, "Transfer : Visa",
                         null, null, null, null, null, savings, null, null)));
     }
 

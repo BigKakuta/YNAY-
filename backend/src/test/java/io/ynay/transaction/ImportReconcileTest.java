@@ -32,12 +32,12 @@ class ImportReconcileTest extends LedgerTestSupport {
     }
 
     private static ImportLine line(LocalDate date, long amount, String payee) {
-        return new ImportLine(date, amount, payee, null, null, null, null);
+        return new ImportLine(date, null, amount, payee, null, null, null, null);
     }
 
     private List<TransactionDto> all(UUID accountId) {
         return transactions.listTransactions(new TransactionActions.ListTransactionsInput(budgetId, accountId, null,
-                null, null, null, null, null, null, null)).transactions();
+                null, null, null, null, null, null, null, null)).transactions();
     }
 
     @Test
@@ -46,7 +46,7 @@ class ImportReconcileTest extends LedgerTestSupport {
                 line(D1, -5_000, "Coffee Shop"),
                 line(D1, -5_000, "Coffee Shop"),
                 line(D1.plusDays(1), 250_000, "Employer"),
-                new ImportLine(D1.plusDays(2), -12_000L, "Grocer", "card 1234", groceries, "FITID-77", null));
+                new ImportLine(D1.plusDays(2), null, -12_000L, "Grocer", "card 1234", groceries, "FITID-77", null));
 
         TransactionActions.ImportResult first = importLines(checking, statement);
         assertThat(first.imported()).isEqualTo(4);
@@ -86,7 +86,7 @@ class ImportReconcileTest extends LedgerTestSupport {
     @Test
     void dedupeIsPerAccountAndWithinTheBatch() {
         UUID savings = account(budgetId, "Savings", AccountType.SAVINGS, 0).id();
-        ImportLine l = new ImportLine(D1, -1_000L, "X", null, null, "ID-1", null);
+        ImportLine l = new ImportLine(D1, null, -1_000L, "X", null, null, "ID-1", null);
         assertThat(importLines(checking, List.of(l, l)).duplicates()).isEqualTo(1);
         assertThat(importLines(savings, List.of(l)).imported()).isEqualTo(1);
     }
@@ -96,7 +96,7 @@ class ImportReconcileTest extends LedgerTestSupport {
         spend(budgetId, checking, D1, -3_000, "Grocer", groceries);
         TransactionActions.ImportResult r = transactions.importTransactions(new TransactionActions.ImportTransactionsInput(
                 budgetId, checking, List.of(line(D1.plusDays(5), -4_000, "GROCER"),
-                new ImportLine(D1.plusDays(5), -1_000L, "Grocer", null, null, null, Cleared.UNCLEARED)), true));
+                new ImportLine(D1.plusDays(5), null, -1_000L, "Grocer", null, null, null, Cleared.UNCLEARED)), true));
         assertThat(r.transactionIds()).extracting(id -> txn(budgetId, id)).allSatisfy(t -> {
             assertThat(t.categoryId()).isEqualTo(groceries);
             assertThat(t.approved()).isTrue();
@@ -114,9 +114,9 @@ class ImportReconcileTest extends LedgerTestSupport {
 
         UUID foreign = category(newBudget(), "Groceries").id();
         assertCode(Code.NOT_FOUND, () -> importLines(checking, List.of(
-                new ImportLine(D1, -1L, "X", null, foreign, null, null))));
+                new ImportLine(D1, null, -1L, "X", null, foreign, null, null))));
         assertCode(Code.INVALID_INPUT, () -> importLines(checking, List.of(
-                new ImportLine(null, -1L, "X", null, null, null, null))));
+                new ImportLine(null, null, -1L, "X", null, null, null, null))));
         assertThat(importLines(checking, List.of()).imported()).isZero();
         // nothing partial was written by the failed batches
         assertThat(all(checking)).hasSize(1);

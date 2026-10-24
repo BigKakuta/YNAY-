@@ -55,6 +55,8 @@ public class TransactionActions {
                     required = false) String search,
             @ActionParam(value = "Only transactions still awaiting approval (e.g. fresh imports)", required = false)
             Boolean unapprovedOnly,
+            @ActionParam(value = "Only charges of tracked subscriptions (payees linked to a subscription)",
+                    required = false) Boolean subscriptionsOnly,
             @ActionParam(value = "Page size (default 200, max 1000)", required = false) Integer limit,
             @ActionParam(value = "Number of transactions to skip (default 0)", required = false) Integer offset) {}
 
@@ -76,7 +78,8 @@ public class TransactionActions {
             throw ActionException.invalid("offset must not be negative");
         }
         return txns.list(new TransactionService.Filter(in.budgetId(), in.accountId(), in.categoryId(), in.payeeId(),
-                in.sinceDate(), in.untilDate(), in.search(), Boolean.TRUE.equals(in.unapprovedOnly()), limit, offset));
+                in.sinceDate(), in.untilDate(), in.search(), Boolean.TRUE.equals(in.unapprovedOnly()),
+                Boolean.TRUE.equals(in.subscriptionsOnly()), limit, offset));
     }
 
     public record GetTransactionInput(
@@ -96,6 +99,8 @@ public class TransactionActions {
             @ActionParam("Budget id") UUID budgetId,
             @ActionParam("Account the transaction is in") UUID accountId,
             @ActionParam("Date, YYYY-MM-DD") LocalDate date,
+            @ActionParam(value = "Local time of day of the payment, HH:MM (from card statements; used by reports)",
+                    required = false) String time,
             @ActionParam("Amount in milliunits; negative = outflow (-12340 = 12.34 spent), positive = inflow")
             Long amount,
             @ActionParam(value = "Existing payee id (a transfer payee makes this a transfer)", required = false)
@@ -130,7 +135,8 @@ public class TransactionActions {
             importId must be unique per account (CONFLICT otherwise); prefer import_transactions for bank data.""")
     public TransactionDto createTransaction(CreateTransactionInput in) {
         access.requireMember(in.budgetId());
-        UUID id = txns.create(in.budgetId(), new TransactionService.Request(in.accountId(), in.date(), in.amount(),
+        UUID id = txns.create(in.budgetId(), new TransactionService.Request(in.accountId(), in.date(), in.time(),
+                in.amount(),
                 in.payeeId(), in.payeeName(), in.categoryId(), false, in.memo(), in.cleared(), in.approved(),
                 in.flagColor(), in.transferAccountId(), in.splits(), in.importId()), true);
         return txns.require(in.budgetId(), id);
@@ -141,6 +147,7 @@ public class TransactionActions {
             @ActionParam("Transaction id") UUID transactionId,
             @ActionParam(value = "Move to this account", required = false) UUID accountId,
             @ActionParam(value = "New date, YYYY-MM-DD", required = false) LocalDate date,
+            @ActionParam(value = "New time of day, HH:MM (\"\" clears it)", required = false) String time,
             @ActionParam(value = "New amount in milliunits (negative = outflow)", required = false) Long amount,
             @ActionParam(value = "New payee id (a transfer payee turns this into a transfer)", required = false)
             UUID payeeId,
@@ -159,7 +166,8 @@ public class TransactionActions {
 
     @McpAction(name = "update_transaction", description = """
             Change fields of a transaction; omitted (null) fields stay unchanged. """ + AMOUNTS + """
-            To clear: memo "" removes the memo, payeeName "" removes the payee, flagColor NONE removes the \
+            To clear: memo "" removes the memo, time "" removes the time of day, payeeName "" removes the payee, \
+            flagColor NONE removes the \
             flag, clearCategory=true makes it uncategorized, splits [] un-splits. \
             On a transfer, changing amount or date updates the other side too (it always holds the negated \
             amount); changing the payee to a normal payee turns it back into a regular transaction and deletes \
@@ -169,7 +177,7 @@ public class TransactionActions {
     public TransactionDto updateTransaction(UpdateTransactionInput in) {
         access.requireMember(in.budgetId());
         txns.update(in.budgetId(), in.transactionId(), new TransactionService.Request(in.accountId(), in.date(),
-                in.amount(), in.payeeId(), in.payeeName(), in.categoryId(), Boolean.TRUE.equals(in.clearCategory()),
+                in.time(), in.amount(), in.payeeId(), in.payeeName(), in.categoryId(), Boolean.TRUE.equals(in.clearCategory()),
                 in.memo(), in.cleared(), in.approved(), in.flagColor(), in.transferAccountId(), in.splits(),
                 in.importId()));
         return txns.require(in.budgetId(), in.transactionId());
@@ -212,7 +220,7 @@ public class TransactionActions {
             Payees are matched case-insensitively by payeeName and created when new; a payeeName of \
             "Transfer : <account>" records a transfer (the other side is created automatically, so don't also \
             import it on the other account). When categoryId is omitted, the payee's most recently used \
-            category is applied. Imported transactions default to cleared=CLEARED and approved=false so the \
+            category is applied. Give the time of day (HH:MM) when the statement has it. Imported transactions default to cleared=CLEARED and approved=false so the \
             user can review them (see list_transactions unapprovedOnly, approve_transactions).""")
     public ImportResult importTransactions(ImportTransactionsInput in) {
         access.requireMember(in.budgetId());
@@ -259,7 +267,7 @@ public class TransactionActions {
                 continue;
             }
             created.add(txns.create(in.budgetId(), new TransactionService.Request(account.id(), line.date(),
-                    line.amount(), null, line.payeeName(), line.categoryId(), false, line.memo(),
+                    line.time(), line.amount(), null, line.payeeName(), line.categoryId(), false, line.memo(),
                     line.cleared() == null ? Cleared.CLEARED : line.cleared(), approved, null, null, null, importId),
                     true));
         }

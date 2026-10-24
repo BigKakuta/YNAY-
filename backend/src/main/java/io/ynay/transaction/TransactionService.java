@@ -11,6 +11,9 @@ import io.ynay.payee.PayeeService;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,8 +43,10 @@ public class TransactionService {
     public static final String STARTING_BALANCE_PAYEE = "Starting Balance";
     public static final String RECONCILIATION_PAYEE = "Reconciliation Balance Adjustment";
 
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
+
     private static final String SELECT = """
-            select t.id, t.budget_id, t.account_id, a.name as account_name, t.date, t.amount, t.payee_id,
+            select t.id, t.budget_id, t.account_id, a.name as account_name, t.date, t.time, t.amount, t.payee_id,
                    p.name as payee_name, t.category_id, c.name as category_name, t.memo, t.cleared, t.approved,
                    t.flag_color, t.transfer_account_id, t.transfer_transaction_id, t.import_id, t.is_split
             from txn t
@@ -86,7 +91,8 @@ public class TransactionService {
     }
 
     public record Filter(UUID budgetId, UUID accountId, UUID categoryId, UUID payeeId, LocalDate sinceDate,
-                         LocalDate untilDate, String search, boolean unapprovedOnly, int limit, int offset) {}
+                         LocalDate untilDate, String search, boolean unapprovedOnly, boolean subscriptionsOnly,
+                         int limit, int offset) {}
 
     public record Page(List<TransactionDto> transactions, long total) {}
 
@@ -126,6 +132,11 @@ public class TransactionService {
         }
         if (f.unapprovedOnly()) {
             where.append(" and not t.approved");
+        }
+        if (f.subscriptionsOnly()) {
+            where.append(" and (p.subscription_id is not null or exists (select 1 from txn_split s"
+                    + " join payee sp on sp.id = s.payee_id where s.transaction_id = t.id"
+                    + " and sp.subscription_id is not null))");
         }
         String from = " from txn t join account a on a.id = t.account_id left join payee p on p.id = t.payee_id"
                 + " left join category c on c.id = t.category_id";
@@ -184,6 +195,7 @@ public class TransactionService {
                 rs.getObject("account_id", UUID.class),
                 rs.getString("account_name"),
                 rs.getObject("date", LocalDate.class),
+                formatTime(rs.getObject("time", LocalTime.class)),
                 rs.getLong("amount"),
                 rs.getObject("payee_id", UUID.class),
                 rs.getString("payee_name"),
@@ -203,10 +215,10 @@ public class TransactionService {
 
     /**
      * A create/update request. {@code null} means "not specified" (on update: unchanged).
-     * {@code payeeName = ""} clears the payee, {@code memo = ""} clears the memo,
-     * {@code flagColor = NONE} clears the flag, {@code splits = []} un-splits.
+     * {@code payeeName = ""} clears the payee, {@code memo = ""} clears the memo, {@code time = ""} clears
+     * the time of day, {@code flagColor = NONE} clears the flag, {@code splits = []} un-splits.
      */
-    public record Request(UUID accountId, LocalDate date, Long amount, UUID payeeId, String payeeName,
+    public record Request(UUID accountId, LocalDate date, String time, Long amount, UUID payeeId, String payeeName,
                           UUID categoryId, boolean clearCategory, String memo, Cleared cleared, Boolean approved,
                           FlagColor flagColor, UUID transferAccountId, List<SplitInput> splits, String importId) {}
 
@@ -218,7 +230,7 @@ public class TransactionService {
     private record SplitDraft(long amount, UUID categoryId, UUID payeeId, String newPayeeName, String memo) {}
 
     /** Snapshot of a stored txn row. */
-    private record Row(UUID id, UUID accountId, LocalDate date, long amount, UUID payeeId, UUID categoryId,
+    private record Row(UUID id, UUID accountId, LocalDate date, LocalTime time, long amount, UUID payeeId, UUID categoryId,
                        String memo, Cleared cleared, boolean approved, String flagColor, UUID transferAccountId,
                        UUID transferTransactionId, String importId, boolean isSplit) {}
 
@@ -233,6 +245,7 @@ public class TransactionService {
             throw ActionException.invalid("amount is required");
         }
         long amount = r.amount();
+        LocalTime time = parseTime(r.time());
         PayeeChoice payee = resolvePayee(budgetId, r.payeeId(), r.payeeName(), r.transferAccountId());
         AccountDto transfer = payee.transferAccount();
         validateTransfer(account, transfer, null);
@@ -259,10 +272,11 @@ public class TransactionService {
         UUID id = UUID.randomUUID();
         try {
             jdbc.sql("""
-                            insert into txn (id, budget_id, account_id, date, amount, payee_id, category_id, memo,
-                                             cleared, approved, flag_color, transfer_account_id, import_id, is_split)
-                            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
-                    .params(id, budgetId, account.id(), r.date(), amount, payeeId,
+                            insert into txn (id, budget_id, account_id, date, time, amount, payee_id, category_id,
+                                             memo, cleared, approved, flag_color, transfer_account_id, import_id,
+                                             is_split)
+                            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
+                    .params(id, budgetId, account.id(), r.date(), time, amount, payeeId,
                             rowCategory(account, transfer, splits, category), Inputs.blankToNull(r.memo()),
                             cleared.name(), approved, r.flagColor() == null ? null : r.flagColor().stored(),
                             transfer == null ? null : transfer.id(), importId, !splits.isEmpty())
@@ -287,6 +301,7 @@ public class TransactionService {
             requireOpen(account);
         }
         LocalDate date = r.date() != null ? r.date() : ex.date();
+        LocalTime time = r.time() != null ? parseTime(r.time()) : ex.time();
         long amount = r.amount() != null ? r.amount() : ex.amount();
 
         PayeeChoice payee;
@@ -353,11 +368,11 @@ public class TransactionService {
         UUID payeeId = persistPayee(budgetId, payee);
         try {
             jdbc.sql("""
-                            update txn set account_id = ?, date = ?, amount = ?, payee_id = ?, category_id = ?, memo = ?,
-                                           cleared = ?, approved = ?, flag_color = ?, transfer_account_id = ?,
+                            update txn set account_id = ?, date = ?, time = ?, amount = ?, payee_id = ?, category_id = ?,
+                                           memo = ?, cleared = ?, approved = ?, flag_color = ?, transfer_account_id = ?,
                                            import_id = ?, is_split = ?, updated_at = now()
                             where id = ?""")
-                    .params(account.id(), date, amount, payeeId, rowCategory(account, transfer, splits, category), memo,
+                    .params(account.id(), date, time, amount, payeeId, rowCategory(account, transfer, splits, category), memo,
                             cleared.name(), approved, flag, transfer == null ? null : transfer.id(), importId,
                             !splits.isEmpty(), ex.id())
                     .update();
@@ -496,6 +511,7 @@ public class TransactionService {
                         rs.getObject("id", UUID.class),
                         rs.getObject("account_id", UUID.class),
                         rs.getObject("date", LocalDate.class),
+                        rs.getObject("time", LocalTime.class),
                         rs.getLong("amount"),
                         rs.getObject("payee_id", UUID.class),
                         rs.getObject("category_id", UUID.class),
@@ -664,6 +680,23 @@ public class TransactionService {
     /** Category stored on the other side of a transfer. */
     private static UUID counterpartCategory(AccountDto account, AccountDto transfer, UUID category) {
         return transfer.onBudget() && !account.onBudget() ? category : null;
+    }
+
+    /** Parses a time of day ({@code HH:MM} or {@code HH:MM:SS}); blank means none. */
+    static LocalTime parseTime(String value) {
+        String v = Inputs.blankToNull(value);
+        if (v == null) {
+            return null;
+        }
+        try {
+            return LocalTime.parse(v.length() == 4 ? "0" + v : v).withNano(0);
+        } catch (DateTimeParseException e) {
+            throw ActionException.invalid("time must be a time of day like 14:05, got '" + v + "'");
+        }
+    }
+
+    static String formatTime(LocalTime time) {
+        return time == null ? null : time.format(TIME);
     }
 
     /** For callers that only have a category id (e.g. imports): validates it belongs to the budget. */

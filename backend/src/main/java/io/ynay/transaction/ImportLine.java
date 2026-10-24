@@ -7,6 +7,8 @@ import java.util.UUID;
 /** {@code ImportLine}: one bank-statement line for {@code import_transactions}. */
 public record ImportLine(
         @ActionParam("Booking date, YYYY-MM-DD") LocalDate date,
+        @ActionParam(value = "Local time of day of the payment, HH:MM, when the statement has it", required = false)
+        String time,
         @ActionParam("Amount in milliunits: -12340 = 12.34 spent (outflow), 250000 = 250.00 received (inflow)")
         Long amount,
         @ActionParam(value = "Payee as it should appear (cleaned up merchant name). Created if it doesn't exist; "

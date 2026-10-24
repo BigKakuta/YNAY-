@@ -64,12 +64,13 @@ class AccountActions {
 * Data access is plain SQL through Spring's `JdbcClient`. No JPA. Schema changes go through Flyway
   (`backend/src/main/resources/db/migration`). `V1__init.sql` is the shared baseline; add `V2__...`
   etc. Coordinate version numbers by area: framework `V1xx`, security `V2xx`, ledger `V3xx`,
-  budgeting `V4xx`, agent `V5xx` (e.g. `V301__payee_index.sql`), so parallel work never collides.
+  budgeting and reports `V4xx`, agent `V5xx` (e.g. `V301__transaction_time.sql`), so parallel work never
+  collides.
 * Spring Boot 4.1 / Spring Framework 7 / Spring Security 7 / **Jackson 3** (`tools.jackson.*`
   packages, not `com.fasterxml.jackson.databind`; annotations are still `com.fasterxml.jackson.annotation`).
 * Java packages: `io.ynay.action` (framework), `io.ynay.mcp`, `io.ynay.security`, `io.ynay.budget`,
   `io.ynay.account`, `io.ynay.category`, `io.ynay.payee`, `io.ynay.transaction`, `io.ynay.month`,
-  `io.ynay.report`, `io.ynay.agent`.
+  `io.ynay.report`, `io.ynay.subscription`, `io.ynay.device`, `io.ynay.agent`.
 * Tests: extend `io.ynay.support.IntegrationTest` (Postgres Testcontainer, needs Docker) and use
   `loginAsNewUser()` to run actions as a user. Call action beans directly in domain tests.
 
@@ -101,6 +102,8 @@ Tables are in `V1__init.sql`. Key rules (YNAB semantics, simplified where noted)
   gives no `importId`, the server generates `YNAY:<amount>:<date>:<occurrence>` (like YNAB's
   `YNAB:` ids) so the same statement imported twice doesn't duplicate.
   Imported transactions default to `approved = false` so the user reviews them.
+* **Time of day**: `txn.time` (optional, `HH:MM`) is the local time of a payment when the bank export
+  has it. Only reports use it.
 
 ### Month math (`get_month_budget`)
 
@@ -172,9 +175,9 @@ DTO shapes are in the next section.
 | `list_payees` | `budgetId` | `Payee[]` |
 | `update_payee` | `budgetId, payeeId, name` | `Payee` |
 | `merge_payees` | `budgetId, sourcePayeeIds[], targetPayeeId` | `Payee` |
-| `list_transactions` | `budgetId, accountId?, categoryId?, payeeId?, sinceDate?, untilDate?, search?, unapprovedOnly?, limit?=200, offset?=0` | `{transactions: Transaction[], total}` (newest first) |
+| `list_transactions` | `budgetId, accountId?, categoryId?, payeeId?, sinceDate?, untilDate?, search?, unapprovedOnly?, subscriptionsOnly?, limit?=200, offset?=0` | `{transactions: Transaction[], total}` (newest first) |
 | `get_transaction` | `budgetId, transactionId` | `Transaction` |
-| `create_transaction` | `budgetId, accountId, date, amount, payeeId?, payeeName?, categoryId?, memo?, cleared?, approved?=true, flagColor?, transferAccountId?, splits?: SplitInput[], importId?` | `Transaction` |
+| `create_transaction` | `budgetId, accountId, date, time?, amount, payeeId?, payeeName?, categoryId?, memo?, cleared?, approved?=true, flagColor?, transferAccountId?, splits?: SplitInput[], importId?` | `Transaction` |
 | `update_transaction` | `budgetId, transactionId` + any create field | `Transaction` |
 | `delete_transaction` | `budgetId, transactionId` | `{deleted: true}` |
 | `import_transactions` | `budgetId, accountId, transactions: ImportLine[], approved?=false` | `{imported, duplicates, transactionIds[], duplicateImportIds[]}` |
@@ -183,7 +186,7 @@ DTO shapes are in the next section.
 | `reconcile_account` | `budgetId, accountId, statementBalance, statementDate?=today` | `{reconciledCount, adjustmentTransactionId?}` |
 
 `SplitInput = {amount, categoryId?, payeeName?, memo?}`;
-`ImportLine = {date, amount, payeeName?, memo?, categoryId?, importId?, cleared?}`.
+`ImportLine = {date, time?, amount, payeeName?, memo?, categoryId?, importId?, cleared?}`.
 When a payee is given by name and doesn't exist, it is created. When `categoryId` is omitted on
 create and the payee was used before, the payee's most recent category is used (YNAB-style
 memorized category) unless the txn is a transfer.
@@ -201,6 +204,53 @@ memorized category) unless the txn is a transfer.
 | `report_spending_by_category` | `budgetId, fromMonth, toMonth` | `{rows: [{categoryId, categoryName, groupName, total}], total}` |
 | `report_income_vs_expense` | `budgetId, fromMonth, toMonth` | `[{month, income, expense, net}]` |
 | `report_net_worth` | `budgetId, fromMonth, toMonth` | `[{month, assets, liabilities, netWorth}]` |
+| `report_cash_flow` | `budgetId, fromMonth, toMonth` | `CashFlow` |
+| `report_payments` | `budgetId, fromMonth?, toMonth?, categoryIds?, payeeIds?, search?, minAmount?, limit?=2000` | `{payments: Payment[], truncated}` (newest first) |
+| `review_purchase` | `budgetId, transactionId, splitId?, rating? (1-5), sensibleReason?, clear?` | review, or `{cleared: true}` |
+| `get_report_settings` | `budgetId` | `ReportSettings` |
+| `update_report_settings` | `budgetId, settings: ReportSettings` (full replacement) | `ReportSettings` |
+
+**Subscriptions (`subscription`) and devices (`device`)**
+| action | input | output |
+|---|---|---|
+| `list_subscriptions` | `budgetId, asOf?=today` | `Subscription[]` (ended last, most expensive first) |
+| `create_subscription` | `budgetId, name, kind?=SUBSCRIPTION, cadence?=MONTHLY, groupName?, note?, variable?, payeeIds?, cancelledOn?` | `Subscription` |
+| `update_subscription` | `budgetId, subscriptionId` + any create field, `reactivate?` | `Subscription` |
+| `delete_subscription` | `budgetId, subscriptionId` | `{deleted: true}` |
+| `list_devices` | `budgetId` | `Device[]` |
+| `create_device` | `budgetId, name, price, purchasedOn, lifespanYears, active?=true, note?` | `Device` |
+| `update_device` | `budgetId, deviceId` + any create field | `Device` |
+| `delete_device` | `budgetId, deviceId` | `{deleted: true}` |
+
+### Cash flow (`report_cash_flow`, `report_payments`)
+
+The Reports page is built on money-flow lines: every non-split transaction and every split line on an
+**on-budget** account (split lines take the parent's payee and memo when they have none), classified as
+
+* `SAVING`: a transfer to or from a tracking account of type `ASSET` or `OTHER` (investments,
+  property), whatever its category; positive = money put away;
+* `INCOME`: categorized to Ready to Assign;
+* `SPENDING`: everything else, **uncategorized included**, and payments to tracking `LOAN` /
+  `MORTGAGE` / `LIABILITY` accounts; positive = spent, refunds count against it.
+
+Transfers between on-budget accounts and "Starting Balance" transactions are left out. (So unlike
+`report_income_vs_expense`, saving is not spending and opening balances are not income.)
+`CashFlowMonth.subscriptions` is the spending on payees of subscriptions of kind `SUBSCRIPTION`.
+
+### Subscriptions
+
+A subscription is linked to payees (`payee.subscription_id`, at most one subscription per payee); its
+charges are the spending lines of those payees on budget accounts, summed per date. Derived, as of
+`asOf`: `lastAmount` (all charges on the last charge date), `previousAmount`, `monthlyCost` (last
+charge per month by cadence: weekly ×52/12, quarterly /3, yearly /12; `variable` plans: average of
+the last 3 full months), `last12Months` (net charges in the 12 full months before `asOf`'s month),
+`nextCharge` = last charge + one period, and `status`: `ENDED` once `cancelledOn ≤ asOf`, `OVERDUE`
+when `asOf` is more than a grace period (4/10/20/31 days) past `nextCharge`, else `ACTIVE`.
+`kind = FIXED` marks contracts (rent, utilities, insurance) that are shown apart from subscriptions.
+
+Devices are the tech replacement budget: `monthlyCost = price / (lifespanYears × 12)`,
+`replaceOn = purchasedOn + lifespanYears`. Purchase reviews (`purchase_review`) key on a transaction
+or one split line; rewriting a transaction's split lines drops the reviews of the old lines.
 
 ## DTO shapes (TypeScript notation)
 
@@ -242,6 +292,32 @@ type MonthBudget = { month: string; currencyCode: string; readyToAssign: number;
                      overspentLastMonth: number; uncategorized: number; groups: GroupMonth[] };
                      // groups excludes the INTERNAL group; totals exclude Ready to Assign
 type MonthSummary = { month: string; income: number; assigned: number; activity: number; readyToAssign: number };
+// Transaction also has time: string | null ("HH:MM").
+type CashFlow = { months: { month: string; income: number; spending: number; saving: number; subscriptions: number }[];
+                  rows: { month: string; kind: "INCOME" | "SPENDING" | "SAVING"; categoryId: string | null;
+                          categoryName: string | null; groupId: string | null; groupName: string | null;
+                          payeeId: string | null; payeeName: string | null; subscriptionId: string | null;
+                          accountId: string | null; accountName: string | null; // SAVING: the tracking account
+                          amount: number; count: number }[] };
+type Payment = { transactionId: string; splitId: string | null; date: string; time: string | null;
+                 accountId: string; accountName: string; payeeId: string | null; payeeName: string | null;
+                 categoryId: string | null; categoryName: string | null; groupName: string | null;
+                 memo: string | null; amount: number; // positive = spent, negative = refund
+                 subscriptionId: string | null;
+                 review: { rating: number | null; sensibleReason: string | null } | null };
+type ReportSettings = { thingsCategoryIds: string[] | null; thingsMonthlyTarget: number | null;
+                        focusCategoryIds: string[] | null; focusPayeeId: string | null;
+                        reviewMinAmount: number | null; grossSalaryPerYear: number | null;
+                        salaryPayeeId: string | null };   // null = not set
+type Subscription = { id: string; name: string; kind: "SUBSCRIPTION" | "FIXED";
+                      cadence: "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY"; groupName: string | null;
+                      note: string | null; variable: boolean; cancelledOn: string | null;
+                      payees: { id: string; name: string }[]; status: "ACTIVE" | "OVERDUE" | "ENDED";
+                      chargeCount: number; firstCharge: string | null; lastCharge: string | null;
+                      lastAmount: number; previousAmount: number | null; monthlyCost: number;
+                      last12Months: number; nextCharge: string | null };
+type Device = { id: string; name: string; price: number; purchasedOn: string; lifespanYears: number;
+                active: boolean; note: string | null; monthlyCost: number; replaceOn: string };
 ```
 
 ## HTTP surface

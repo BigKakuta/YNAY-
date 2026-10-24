@@ -1,5 +1,5 @@
 // In-memory data model of the mock backend (see ./index.ts). Shapes follow V1__init.sql loosely.
-import type { AccountType, Cleared, Role, Target } from '../api/types';
+import type { AccountType, Cadence, Cleared, ReportSettings, Role, SubscriptionKind, Target } from '../api/types';
 import { addMonths, currentMonth, todayIso } from '../lib/dates';
 
 export interface MUser { id: string; username: string; displayName: string | null; email: string | null }
@@ -18,16 +18,25 @@ export interface MCategory {
   sortOrder: number; systemKind: 'READY_TO_ASSIGN' | 'CREDIT_CARD_PAYMENT' | null;
   linkedAccountId: string | null; target: Target | null;
 }
-export interface MPayee { id: string; budgetId: string; name: string; transferAccountId: string | null }
+export interface MPayee { id: string; budgetId: string; name: string; transferAccountId: string | null; subscriptionId?: string | null }
 export interface MSplit { id: string; amount: number; categoryId: string | null; payeeId: string | null; memo: string | null }
 export interface MTxn {
-  id: string; budgetId: string; accountId: string; date: string; amount: number;
+  id: string; budgetId: string; accountId: string; date: string; time?: string | null; amount: number;
   payeeId: string | null; categoryId: string | null; memo: string | null; cleared: Cleared;
   approved: boolean; flagColor: string | null; transferAccountId: string | null;
   transferTransactionId: string | null; importId: string | null; splits: MSplit[]; seq: number;
   /** Starting balance of credit/tracking accounts: no budget effect. */
   noBudgetEffect?: boolean;
 }
+export interface MSubscription {
+  id: string; budgetId: string; name: string; kind: SubscriptionKind; cadence: Cadence; groupName: string | null;
+  note: string | null; variable: boolean; cancelledOn: string | null;
+}
+export interface MDevice {
+  id: string; budgetId: string; name: string; price: number; purchasedOn: string; lifespanYears: number;
+  active: boolean; note: string | null;
+}
+export interface MReview { transactionId: string; splitId: string | null; rating: number | null; sensibleReason: string | null }
 export interface MToken {
   id: string; userId: string; name: string; tokenPrefix: string; createdAt: string;
   lastUsedAt: string | null; expiresAt: string | null;
@@ -46,6 +55,10 @@ export interface MockState {
   /** `${categoryId}|${month}` → assigned milliunits */
   assignments: Record<string, number>;
   tokens: MToken[];
+  subscriptions: MSubscription[];
+  devices: MDevice[];
+  reviews: MReview[];
+  reportSettings: Record<string, ReportSettings>;
   seq: number;
 }
 
@@ -73,6 +86,10 @@ export function emptyState(): MockState {
     txns: [],
     assignments: {},
     tokens: [],
+    subscriptions: [],
+    devices: [],
+    reviews: [],
+    reportSettings: {},
     seq: 0,
   };
 }
