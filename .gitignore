@@ -22,3 +22,20 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# Keep the Gradle wrapper jar
+!backend/gradle/wrapper/gradle-wrapper.jar
+
+# Build outputs
+backend/build/
+backend/.gradle/
+backend/bin/
+frontend/node_modules/
+frontend/dist/
+result
+result-*
+.direnv/
+.env
+*.local
+.idea/
+.vscode/

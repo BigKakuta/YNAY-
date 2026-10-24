@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: ynay
+  datasource:
+    url: ${YNAY_DB_URL:jdbc:postgresql://localhost:5432/ynay}
+    username: ${YNAY_DB_USER:ynay}
+    password: ${YNAY_DB_PASSWORD:ynay}
+  flyway:
+    enabled: true
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${YNAY_PORT:8080}
+  forward-headers-strategy: framework
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
