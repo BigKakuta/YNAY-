@@ -11,4 +11,10 @@ spirit of YNAB, built for the homelab:
 - **Kanidm SSO**: login is OIDC only.
 - Spring Boot (Java 25) + Postgres + React, packaged as Docker images built with a Nix flake.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+## Docs
+
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): run it in your homelab (Docker image built by Nix, or the NixOS module)
+- [docs/KANIDM.md](docs/KANIDM.md): set up the Kanidm OAuth2 client
+- [docs/MCP.md](docs/MCP.md): connect Claude Code, Claude Desktop or any MCP client
+- [docs/IMPORT_AGENT.md](docs/IMPORT_AGENT.md): import transactions with the agent
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): design, actions, budgeting rules

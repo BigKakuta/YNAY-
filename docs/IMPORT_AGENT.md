@@ -133,8 +133,8 @@ This repository includes a ready-made Claude Code subagent, `.claude/agents/ynay
 with the same import rules as the in-app assistant. It can read local files, so you don't have to
 paste anything.
 
-1. Create an API token in **Settings → API tokens** and add the server (see
-   `docs/MCP_CLIENTS.md`):
+1. Create an API token in **Settings → MCP access tokens** and add the server (see
+   `docs/MCP.md`):
 
    ```sh
    claude mcp add --scope user --transport http ynay https://ynay.example.com/mcp \
