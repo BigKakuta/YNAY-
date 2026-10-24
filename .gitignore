@@ -45,3 +45,6 @@ result-*
 
 # Throwaway Kanidm from deploy/kanidm/dev-kanidm.sh
 .kanidm-dev/
+
+# e2e/ui-smoke.mjs output (screenshots, MCP token)
+e2e/out/
