@@ -89,6 +89,27 @@ describe('App', () => {
     expect(screen.queryAllByText('New')).toHaveLength(0);
   });
 
+  it('flags uncategorized transactions only where the budget needs a category', async () => {
+    const b = household();
+    const account = (name: string) =>
+      (backend.handlers.list_accounts!({ budgetId: b.id }) as { id: string; name: string }[]).find((a) => a.name === name)!;
+    const card = backend.handlers.create_account!({ budgetId: b.id, name: 'Amex', type: 'CREDIT_CARD', startingBalance: -200_000 }) as { id: string };
+    backend.handlers.create_transaction!({ budgetId: b.id, accountId: card.id, date: '2026-01-15', amount: -9_000, payeeName: 'Kiosk' });
+
+    // a credit card's opening debt has no budget effect; a new uncategorized purchase does
+    const { unmount } = renderAt(`/budgets/${b.id}/accounts/${card.id}`);
+    const kiosk = (await screen.findByText('Kiosk')).closest('tr')!;
+    expect(within(kiosk).getByText('Uncategorized')).toBeInTheDocument();
+    const opening = screen.getByText('Starting Balance').closest('tr')!;
+    expect(within(opening).queryByText('Uncategorized')).not.toBeInTheDocument();
+    unmount();
+
+    // tracking accounts never take categories
+    renderAt(`/budgets/${b.id}/accounts/${account('Brokerage').id}`);
+    await screen.findByText('Starting Balance');
+    expect(screen.queryByText('Uncategorized')).not.toBeInTheDocument();
+  });
+
   // update_* actions treat null as "unchanged"; clearing a text field has to send "".
   const lastBody = (action: string) => {
     const call = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith(`/api/actions/${action}`)).at(-1);
