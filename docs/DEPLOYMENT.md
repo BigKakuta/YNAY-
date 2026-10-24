@@ -205,7 +205,7 @@ How it works:
 * Local database: pgjdbc cannot use unix sockets without an extra native library, so the app
   connects over TCP to `localhost` with SCRAM password auth for the `ynay` role. The oneshot
   `ynay-db-setup.service` sets that password on every start. It uses `database.passwordFile` if you
-  set it. Otherwise it generates a random 40-character password once into
+  set it. Otherwise it generates a random ~48-character password once into
   `/var/lib/ynay-db/password` (0600, owned by `postgres`). Peer or `trust` auth is not used.
 * Remote database: set `database.createLocally = false`, `database.url`, `database.user` and
   `database.passwordFile`.

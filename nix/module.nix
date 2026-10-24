@@ -296,7 +296,7 @@ in
             ''
               pw_file=${generatedPasswordFile}
               if [ ! -s "$pw_file" ]; then
-                tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40 >"$pw_file"
+                head -c 36 /dev/urandom | base64 -w0 | tr -d '/+=' >"$pw_file"
               fi
             ''
         }
