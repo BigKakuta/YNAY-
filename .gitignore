@@ -39,3 +39,6 @@ result-*
 *.local
 .idea/
 .vscode/
+
+# Claude Code subagent worktrees
+.claude/worktrees/

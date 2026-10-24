@@ -285,6 +285,7 @@ the given budget.
 | `YNAY_KANIDM_URL` | – | Kanidm origin, e.g. `https://idm.example.com` |
 | `YNAY_KANIDM_CLIENT_ID` | `ynay` | OAuth2 client name in Kanidm |
 | `YNAY_KANIDM_CLIENT_SECRET` | – | client secret (`kanidm system oauth2 show-basic-secret ynay`) |
+| `YNAY_MCP_ALLOWED_ORIGINS` | – | extra comma-separated `Origin`s allowed on `/mcp` (e.g. MCP Inspector `http://localhost:6274`); requests without `Origin` and from `YNAY_PUBLIC_URL` are always allowed |
 | `YNAY_MCP_INTROSPECTION` | `false` | also accept Kanidm access tokens on `/mcp` via RFC 7662 introspection |
 | `YNAY_AGENT_PROVIDER` | `anthropic` | `anthropic` or `openai` (any OpenAI-compatible server: Ollama, llama.cpp, vLLM) |
 | `YNAY_AGENT_API_KEY` | – | API key; agent is disabled when unset (except `openai` with a local base URL) |
